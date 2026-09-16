@@ -49,6 +49,10 @@ h3 {
   background-repeat: no-repeat;
 }
 
+.app-shell.page-demo {
+  background-image: url('./assets/gait_bg_two.png');
+}
+
 .navbar {
   position: fixed;
   left: 0;
@@ -175,6 +179,63 @@ h3 {
   right: 4vw;
   top: 14vh;
   width: min(28vw, 460px);
+  pointer-events: none;
+  z-index: 1;
+}
+
+.page-demo-content {
+  display: flex;
+  flex-direction: column;
+  min-height: calc(100svh - 96px);
+  padding-top: 160px;
+}
+
+.demo-header {
+  position: fixed;
+  top: 40px;
+  left: 96px;
+  right: 0;
+  text-align: center;
+  z-index: 2;
+}
+
+.page-demo-content .demo-heading {
+  font-size: 48px;
+  line-height: 1.15;
+  margin: 0;
+}
+
+.demo-evidence-group {
+  position: fixed;
+  left: 32vw;
+  top: 22vh;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 14px;
+  z-index: 2;
+}
+
+.demo-board-text {
+  color: var(--muted);
+  font-size: 18px;
+  max-width: 320px;
+  margin: 0;
+}
+
+.demo-bottom {
+  position: fixed;
+  left: 32vw;
+  top: 60vh;
+  transform: translateY(-50%);
+  z-index: 2;
+}
+
+.demo-duck {
+  position: fixed;
+  left: calc(96px - 2vw);
+  bottom: 4vh;
+  width: min(18vw, 280px);
   pointer-events: none;
   z-index: 1;
 }
