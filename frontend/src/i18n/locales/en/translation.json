@@ -1,0 +1,11 @@
+{
+  "nav": {
+    "home": "Home",
+    "demo": "Demo",
+    "about": "About"
+  },
+  "home": {
+    "title": "Swalker",
+    "description": "A silhouette-based gait recognition system that identifies people by the way they walk. This site will showcase the model and let you try an interactive demo."
+  }
+}

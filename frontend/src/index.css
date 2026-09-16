@@ -1,0 +1,159 @@
+:root {
+  --bg-deep: #2C2B30;
+  --bg-secondary: #36353A;
+
+  --accent: #F58F7C;
+  --accent-soft: #F2C4CE;
+  --accent-shadow: #C9787C;
+  --muted: #D6D6D6;
+
+  --text: #F4F1F1;
+  --text-h: #F4F1F1;
+  --border: rgba(79, 79, 81, 0.6);
+  --accent-bg: rgba(245, 143, 124, 0.14);
+
+  --sans: system-ui, 'Segoe UI', Roboto, sans-serif;
+
+  font: 16px/1.5 var(--sans);
+  color: var(--text);
+  background: linear-gradient(160deg, var(--bg-deep) 0%, var(--bg-secondary) 100%);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+}
+
+h1,
+h2,
+h3 {
+  color: var(--text-h);
+  font-weight: 600;
+}
+
+.app-shell {
+  display: flex;
+  flex-direction: column;
+  min-height: 100svh;
+  background-image: url('./assets/gait_bg.png');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+.navbar {
+  padding: 24px 24px 0;
+}
+
+.navbar-inner {
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 10px 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: rgba(54, 53, 58, 0.7);
+  border: 1px solid var(--border);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(12px);
+}
+
+.navbar nav {
+  display: flex;
+  gap: 28px;
+}
+
+.nav-link {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 2px;
+  color: var(--muted);
+  text-decoration: none;
+  font-size: 16px;
+  font-weight: 500;
+}
+
+.nav-link:hover {
+  color: var(--text-h);
+}
+
+.nav-link.active {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.nav-link.active::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -10px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--accent);
+}
+
+.app-content {
+  flex: 1;
+  max-width: 960px;
+  margin: 0 auto;
+  width: 100%;
+  padding: 48px 24px;
+}
+
+.page h1 {
+  font-size: 36px;
+  margin: 0 0 16px;
+}
+
+.page p {
+  margin: 0 0 8px;
+  max-width: 640px;
+  color: var(--muted);
+}
+
+.page-hero {
+  margin-top: 90px;
+}
+
+.page-hero h1 {
+  font-size: 48px;
+  line-height: 1.15;
+  margin-bottom: 20px;
+}
+
+.hero-accent {
+  color: var(--accent);
+  font-style: italic;
+}
+
+.page-hero .hero-sub {
+  color: var(--muted);
+  font-size: 17px;
+  margin-bottom: 40px;
+  max-width: 520px;
+}
+
+.hero-brand {
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.hero-duck {
+  position: fixed;
+  right: 4vw;
+  top: 14vh;
+  width: min(28vw, 460px);
+  pointer-events: none;
+  z-index: 1;
+}
