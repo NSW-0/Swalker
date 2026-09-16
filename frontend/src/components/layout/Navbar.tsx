@@ -19,10 +19,11 @@ export default function Navbar() {
               key={to}
               to={to}
               end={end}
+              title={label}
               className={({ isActive }) => (isActive ? 'nav-link active' : 'nav-link')}
             >
               <Icon fontSize="inherit" />
-              {label}
+              <span className="nav-label">{label}</span>
             </NavLink>
           ))}
         </nav>
