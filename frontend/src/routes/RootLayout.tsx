@@ -3,6 +3,7 @@ import Navbar from '../components/layout/Navbar'
 
 const pageBackgroundClass: Record<string, string> = {
   '/demo': 'page-demo',
+  '/archive': 'page-archive',
 }
 
 export default function RootLayout() {

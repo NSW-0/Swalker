@@ -53,6 +53,10 @@ h3 {
   background-image: url('./assets/gait_bg_two.png');
 }
 
+.app-shell.page-archive {
+  background-image: url('./assets/gait_bg_three.png');
+}
+
 .navbar {
   position: fixed;
   left: 0;
@@ -128,14 +132,18 @@ h3 {
 }
 
 .page h1 {
-  font-size: 36px;
-  margin: 0 0 16px;
+  font-size: 48px;
+  line-height: 1.15;
+  margin: 0 0 20px;
 }
 
 .page p {
   margin: 0 0 8px;
   max-width: 640px;
   color: var(--muted);
+  font-size: 20px;
+  font-weight: 500;
+  line-height: 1.5;
 }
 
 .page-hero {
@@ -238,4 +246,178 @@ h3 {
   width: min(18vw, 280px);
   pointer-events: none;
   z-index: 1;
+}
+
+.page-archive-content {
+  display: flex;
+  flex-direction: column;
+  height: calc(100svh - 96px);
+  padding-top: 120px;
+  overflow: hidden;
+}
+
+.archive-header {
+  position: fixed;
+  top: 24px;
+  left: 96px;
+  right: 0;
+  text-align: center;
+  z-index: 2;
+}
+
+.page-archive-content .archive-heading {
+  font-size: 48px;
+  line-height: 1.15;
+  margin: 0;
+}
+
+.page-archive-content .archive-subtext {
+  color: var(--muted);
+  font-size: 22px;
+  font-weight: 600;
+  line-height: 1.4;
+  max-width: 640px;
+  margin: 0 0 24px;
+}
+
+.archive-grid-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 8px;
+  padding-bottom: 24px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(245, 143, 124, 0.35) transparent;
+}
+
+.archive-grid-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+
+.archive-grid-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.archive-grid-scroll::-webkit-scrollbar-thumb {
+  background-color: rgba(245, 143, 124, 0.35);
+  border-radius: 999px;
+}
+
+.archive-grid-scroll::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(245, 143, 124, 0.6);
+}
+
+.archive-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+
+.archive-card {
+  display: block;
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  background: rgba(54, 53, 58, 0.7);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px 14px;
+  cursor: pointer;
+  backdrop-filter: blur(6px);
+  transition: border-color 0.15s ease, transform 0.15s ease, background 0.15s ease;
+}
+
+.archive-card:hover {
+  border-color: var(--accent);
+  transform: translateY(-2px);
+  background: rgba(54, 53, 58, 0.9);
+}
+
+.archive-card-add {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  border: 1.5px dashed var(--border);
+  background: rgba(54, 53, 58, 0.35);
+}
+
+.archive-card-add:hover {
+  border-color: var(--accent);
+  background: rgba(54, 53, 58, 0.55);
+}
+
+.archive-card-add-icon {
+  font-size: 32px;
+  color: var(--accent);
+  margin-bottom: 10px;
+}
+
+.archive-duck {
+  position: fixed;
+  right: 4vw;
+  bottom: 4vh;
+  width: min(18vw, 280px);
+  pointer-events: none;
+  z-index: 1;
+}
+
+.archive-card-id {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--text-h);
+  margin: 0 0 6px;
+}
+
+.archive-card-hint {
+  color: var(--muted);
+  font-size: 14px;
+  margin: 0;
+}
+
+.archive-dialog-title {
+  font-weight: 700;
+}
+
+.archive-detail-row {
+  margin: 0 0 12px;
+  color: var(--muted);
+  font-size: 15px;
+}
+
+.archive-detail-label {
+  color: var(--text-h);
+  font-weight: 600;
+  margin-right: 6px;
+}
+
+.archive-vector-box {
+  background: rgba(44, 43, 48, 0.6);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px;
+  margin-top: 8px;
+}
+
+.archive-vector-preview {
+  font-family: monospace;
+  font-size: 13px;
+  color: var(--muted);
+  word-break: break-all;
+  margin: 8px 0 0;
+}
+
+.archive-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--accent-bg);
+  color: var(--accent);
+  border-radius: 999px;
+  padding: 4px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  margin-right: 8px;
 }
