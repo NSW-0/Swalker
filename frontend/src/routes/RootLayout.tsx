@@ -2,7 +2,7 @@ import { Outlet, useLocation } from 'react-router-dom'
 import Navbar from '../components/layout/Navbar'
 
 const pageBackgroundClass: Record<string, string> = {
-  '/demo': 'page-demo',
+  '/crime-scene': 'page-demo',
   '/archive': 'page-archive',
 }
 

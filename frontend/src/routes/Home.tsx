@@ -19,7 +19,7 @@ export default function Home() {
       </p>
       <Button
         component={Link}
-        to="/demo"
+        to="/crime-scene"
         variant="contained"
         sx={{ borderRadius: '999px', px: 4, py: 1.5, fontSize: '1.05rem' }}
       >
