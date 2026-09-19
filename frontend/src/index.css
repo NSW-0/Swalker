@@ -57,6 +57,10 @@ h3 {
   background-image: url('./assets/gait_bg_three.png');
 }
 
+.app-shell.page-about {
+  background-image: url('./assets/gait_bg_four.png');
+}
+
 .navbar {
   position: fixed;
   left: 0;
@@ -425,4 +429,136 @@ h3 {
   font-size: 13px;
   font-weight: 600;
   margin-right: 8px;
+}
+
+.page-about-content {
+  display: flex;
+  flex-direction: column;
+  height: calc(100svh - 96px);
+  padding-top: 120px;
+  overflow: hidden;
+}
+
+.about-header {
+  position: fixed;
+  top: 24px;
+  left: 96px;
+  right: 0;
+  text-align: center;
+  z-index: 2;
+}
+
+.page-about-content .about-heading {
+  font-size: 48px;
+  line-height: 1.15;
+  margin: 0;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.85), 0 1px 3px rgba(0, 0, 0, 0.9);
+}
+
+.about-bubbles-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-top: 20px;
+  padding-right: 8px;
+  padding-bottom: 24px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(245, 143, 124, 0.35) transparent;
+}
+
+.about-bubbles-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+
+.about-bubbles-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.about-bubbles-scroll::-webkit-scrollbar-thumb {
+  background-color: rgba(245, 143, 124, 0.35);
+  border-radius: 999px;
+}
+
+.about-bubbles-scroll::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(245, 143, 124, 0.6);
+}
+
+.about-bubbles {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  max-width: 700px;
+  margin-top: 0;
+}
+
+.about-duck {
+  position: fixed;
+  right: 4vw;
+  bottom: 4vh;
+  width: min(18vw, 280px);
+  pointer-events: none;
+  z-index: 1;
+}
+
+.about-bubble {
+  position: relative;
+  background: rgba(244, 241, 241, 0.97);
+  border-radius: 20px;
+  padding: 30px 32px 26px;
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.35);
+}
+
+.about-bubble-index {
+  position: absolute;
+  top: -14px;
+  left: 28px;
+  background: var(--accent);
+  color: var(--bg-deep);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  border-radius: 999px;
+  padding: 5px 14px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.25);
+}
+
+.about-bubble-title {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--bg-deep);
+  margin: 6px 0 16px;
+}
+
+.about-bubbles .about-bubble-text {
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 1.65;
+  color: #45444a;
+  max-width: none;
+  margin: 0;
+}
+
+.about-bubble-steps {
+  margin: 0;
+  padding-left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 1.5;
+  color: #45444a;
+}
+
+.about-bubble-steps li::marker {
+  color: var(--accent-shadow);
+  font-weight: 700;
+}
+
+.about-bubbles .about-bubble-credit {
+  margin: 18px 0 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: #85838a;
+  max-width: none;
 }

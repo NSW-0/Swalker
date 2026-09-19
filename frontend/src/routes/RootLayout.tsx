@@ -4,6 +4,7 @@ import Navbar from '../components/layout/Navbar'
 const pageBackgroundClass: Record<string, string> = {
   '/crime-scene': 'page-demo',
   '/archive': 'page-archive',
+  '/about': 'page-about',
 }
 
 export default function RootLayout() {
