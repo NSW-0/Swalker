@@ -1,13 +1,13 @@
 import { NavLink, useLocation } from 'react-router-dom'
 import Tooltip from '@mui/material/Tooltip'
 import HomeOutlinedIcon from '@mui/icons-material/HomeOutlined'
-import PlayCircleOutlinedIcon from '@mui/icons-material/PlayCircleOutlined'
+import SearchOutlinedIcon from '@mui/icons-material/SearchOutlined'
 import Inventory2OutlinedIcon from '@mui/icons-material/Inventory2Outlined'
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined'
 
 const links = [
   { to: '/', label: 'Home', end: true, Icon: HomeOutlinedIcon },
-  { to: '/crime-scene', label: 'Crime Scene', Icon: PlayCircleOutlinedIcon },
+  { to: '/crime-scene', label: 'Crime Scene', Icon: SearchOutlinedIcon },
   { to: '/archive', label: 'Archive', Icon: Inventory2OutlinedIcon },
   { to: '/about', label: 'About', Icon: InfoOutlinedIcon },
 ]
