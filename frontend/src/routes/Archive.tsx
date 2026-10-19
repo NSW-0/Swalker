@@ -1,12 +1,14 @@
 import { useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import Dialog from '@mui/material/Dialog'
 import DialogTitle from '@mui/material/DialogTitle'
 import DialogContent from '@mui/material/DialogContent'
 import IconButton from '@mui/material/IconButton'
 import CloseIcon from '@mui/icons-material/Close'
 import AddOutlinedIcon from '@mui/icons-material/AddOutlined'
-import { mockGallery, FEATURE_DIM } from '../data/mockGallery'
+import { FEATURE_DIM } from '../data/mockGallery'
 import type { GalleryEntry } from '../data/mockGallery'
+import { getArchive } from '../data/archiveStore'
 import duckSmoking from '../assets/duck_smoking.png'
 
 function l2Norm(vector: number[]) {
@@ -14,7 +16,13 @@ function l2Norm(vector: number[]) {
 }
 
 export default function Archive() {
-  const [selected, setSelected] = useState<GalleryEntry | null>(null)
+  const [entries] = useState(getArchive)
+  // /archive?person=person_021 opens that case file straight away
+  // (used after saving an unknown walker on the Verdict page).
+  const [searchParams] = useSearchParams()
+  const [selected, setSelected] = useState<GalleryEntry | null>(
+    () => entries.find((e) => e.personId === searchParams.get('person')) ?? null,
+  )
 
   return (
     <section className="page page-archive-content">
@@ -39,7 +47,7 @@ export default function Archive() {
             <p className="archive-card-id">Add Case File</p>
           </button>
 
-          {mockGallery.map((entry) => (
+          {entries.map((entry) => (
             <button
               key={entry.personId}
               type="button"

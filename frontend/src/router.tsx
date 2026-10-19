@@ -4,6 +4,7 @@ import Home from './routes/Home'
 import Demo from './routes/Demo'
 import Archive from './routes/Archive'
 import About from './routes/About'
+import Verdict from './routes/Verdict'
 import NotFound from './routes/NotFound'
 
 export const router = createBrowserRouter([
@@ -13,6 +14,7 @@ export const router = createBrowserRouter([
     children: [
       { index: true, element: <Home /> },
       { path: 'crime-scene', element: <Demo /> },
+      { path: 'crime-scene/verdict', element: <Verdict /> },
       { path: 'archive', element: <Archive /> },
       { path: 'about', element: <About /> },
       { path: '*', element: <NotFound /> },

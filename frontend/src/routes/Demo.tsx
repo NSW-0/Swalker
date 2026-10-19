@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import Button from '@mui/material/Button'
 import UploadFileOutlinedIcon from '@mui/icons-material/UploadFileOutlined'
 import CheckCircleOutlinedIcon from '@mui/icons-material/CheckCircleOutlined'
@@ -32,6 +33,8 @@ export default function Demo() {
 
       <div className="demo-bottom">
         <Button
+          component={Link}
+          to="/crime-scene/verdict"
           variant="contained"
           disabled={!clueAdded}
           startIcon={<SearchOutlinedIcon />}

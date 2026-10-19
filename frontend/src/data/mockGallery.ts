@@ -15,7 +15,7 @@ export interface GalleryEntry {
 
 // Small seedable PRNG (mulberry32) so each person's mock vector is stable
 // across reloads instead of reshuffling on every render.
-function mulberry32(seed: number) {
+export function mulberry32(seed: number) {
   return function () {
     seed |= 0
     seed = (seed + 0x6d2b79f5) | 0
