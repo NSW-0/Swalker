@@ -3,6 +3,7 @@ import Navbar from '../components/layout/Navbar'
 
 const pageBackgroundClass: Record<string, string> = {
   '/crime-scene': 'page-demo',
+  '/crime-scene/verdict': 'page-verdict',
   '/archive': 'page-archive',
   '/about': 'page-about',
 }

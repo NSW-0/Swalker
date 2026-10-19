@@ -61,6 +61,10 @@ h3 {
   background-image: url('./assets/gait_bg_four.png');
 }
 
+.app-shell.page-verdict {
+  background-image: url('./assets/emptyBg.png');
+}
+
 .navbar {
   position: fixed;
   left: 0;
@@ -219,7 +223,7 @@ h3 {
 
 .demo-evidence-group {
   position: fixed;
-  left: 32vw;
+  left: 36vw;
   top: 22vh;
   display: flex;
   flex-direction: column;
@@ -240,7 +244,7 @@ h3 {
 
 .demo-bottom {
   position: fixed;
-  left: 32vw;
+  left: 36vw;
   top: 60vh;
   transform: translateY(-50%);
   z-index: 2;
@@ -561,4 +565,556 @@ h3 {
   font-weight: 600;
   color: #85838a;
   max-width: none;
+}
+
+/* ── Verdict page (/crime-scene/verdict) ─────────────────────────────
+   Every rule is scoped under .page-verdict-content so it beats the
+   generic `.page p` / `.page h1` rules. */
+
+.page-verdict-content {
+  height: calc(100svh - 96px);
+  overflow: hidden;
+}
+
+.page-verdict-content .verdict-header {
+  position: fixed;
+  top: 24px;
+  left: 96px;
+  right: 0;
+  text-align: center;
+  z-index: 2;
+}
+
+.page-verdict-content .verdict-heading {
+  font-size: 48px;
+  line-height: 1.15;
+  margin: 0 0 8px;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.85), 0 1px 3px rgba(0, 0, 0, 0.9);
+}
+
+.page-verdict-content .verdict-caseline {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  max-width: none;
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.page-verdict-content .verdict-tag {
+  background: var(--accent-bg);
+  color: var(--accent);
+  border-radius: 999px;
+  padding: 3px 12px;
+  font-size: 14px;
+}
+
+/* loading screen */
+
+.page-verdict-content .loader {
+  position: fixed;
+  top: 130px;
+  left: 96px;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding-bottom: 60px;
+}
+
+.page-verdict-content .loader-ring {
+  position: relative;
+  width: 300px;
+  height: 300px;
+}
+
+.page-verdict-content .loader-ring svg {
+  position: absolute;
+  inset: 0;
+  transform: rotate(-90deg);
+}
+
+.page-verdict-content .loader-track {
+  fill: none;
+  stroke: rgba(244, 241, 241, 0.14);
+}
+
+.page-verdict-content .loader-fill {
+  fill: none;
+  stroke: var(--accent);
+  stroke-linecap: round;
+  filter: drop-shadow(0 0 6px rgba(245, 143, 124, 0.6));
+}
+
+.page-verdict-content .loader-disc {
+  position: absolute;
+  inset: 20px;
+  border-radius: 50%;
+  background: rgba(244, 241, 241, 0.97);
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.page-verdict-content .loader-sprite {
+  width: 172px;
+  height: 209px;
+  margin-top: 14px;
+  background-repeat: no-repeat;
+}
+
+.page-verdict-content .loader-step {
+  margin: 28px 0 4px;
+  max-width: none;
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--text-h);
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.85);
+}
+
+.page-verdict-content .loader-percent {
+  margin: 0;
+  max-width: none;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+/* result */
+
+/* The result fits the screen; nothing scrolls on desktop. */
+.page-verdict-content .verdict-stage {
+  position: fixed;
+  top: 140px;
+  left: 96px;
+  right: 0;
+  bottom: 0;
+  overflow: hidden;
+  /* the right side is kept free for the duck in the corner */
+  padding: 24px calc(4vw + 190px) 24px 32px;
+}
+
+.page-verdict-content .verdict-duck {
+  position: fixed;
+  right: 4vw;
+  bottom: 4vh;
+  z-index: 1;
+  pointer-events: none;
+}
+
+/* duckGem.png has equal empty space left and right; cover trims it off */
+.page-verdict-content .verdict-duck-gem {
+  height: min(36vh, 330px);
+  aspect-ratio: 718 / 1254;
+  object-fit: cover;
+}
+
+/* duckNoGem is a full scene, so it is shown as a pinned photo */
+.page-verdict-content .verdict-duck-nogem {
+  width: min(13vw, 190px);
+  aspect-ratio: 3 / 4;
+  object-fit: cover;
+  border: 6px solid #f4f1f1;
+  border-bottom-width: 24px;
+  border-radius: 4px;
+  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.5);
+  transform: rotate(4deg);
+}
+
+/* Round gradient arrow; the label shows as a tooltip on hover. */
+.page-verdict-content .verdict-back {
+  position: fixed;
+  top: 30px;
+  left: 120px;
+  z-index: 3;
+  display: block;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  transition: transform 0.15s ease, filter 0.15s ease;
+}
+
+.page-verdict-content .verdict-back svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.page-verdict-content .verdict-back:hover {
+  transform: scale(1.08);
+  filter: drop-shadow(0 0 10px rgba(245, 143, 124, 0.55));
+}
+
+.page-verdict-content .verdict-back:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+.page-verdict-content .verdict-saved {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  max-width: none;
+  font-size: 15px;
+  font-weight: 600;
+  color: #45444a;
+}
+
+.page-verdict-content .verdict-saved svg {
+  color: var(--accent-shadow);
+}
+
+.page-verdict-content .verdict-saved a {
+  margin-left: 8px;
+  color: var(--accent-shadow);
+  font-weight: 700;
+}
+
+.verdict-dialog-text {
+  margin: 0 0 8px;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.page-verdict-content .verdict-grid {
+  display: grid;
+  grid-template-columns: 1.5fr 1fr;
+  gap: 32px;
+  align-items: start;
+  max-width: 1120px;
+  margin: 0 auto;
+}
+
+.page-verdict-content .verdict-bubble {
+  position: relative;
+  background: rgba(244, 241, 241, 0.97);
+  color: var(--bg-deep);
+  border-radius: 20px;
+  padding: 30px 32px 26px;
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.35);
+}
+
+.page-verdict-content .verdict-bubble-tab {
+  position: absolute;
+  top: -14px;
+  left: 28px;
+  background: var(--accent);
+  color: var(--bg-deep);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  border-radius: 999px;
+  padding: 5px 14px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.25);
+}
+
+.page-verdict-content .verdict-suspect-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.page-verdict-content .verdict-suspect-id {
+  margin: 4px 0 0;
+  font-size: 40px;
+  font-weight: 800;
+  line-height: 1.15;
+  color: var(--bg-deep);
+}
+
+.page-verdict-content .verdict-suspect-sub {
+  margin: 2px 0 0;
+  font-size: 17px;
+  color: #45444a;
+}
+
+.page-verdict-content .verdict-stamp {
+  border: 3px solid var(--accent-shadow);
+  color: var(--accent-shadow);
+  font-weight: 800;
+  font-size: 15px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  padding: 6px 14px;
+  border-radius: 8px;
+  transform: rotate(-6deg);
+}
+
+.page-verdict-content .verdict-stamp-unknown {
+  border-color: #7a7980;
+  color: #7a7980;
+}
+
+.page-verdict-content .verdict-meter {
+  margin: 24px 0 0;
+}
+
+.page-verdict-content .verdict-meter-label {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #45444a;
+}
+
+.page-verdict-content .verdict-meter-track {
+  position: relative;
+  height: 12px;
+  margin-top: 8px;
+  border-radius: 999px;
+  background: #dcd8d8;
+}
+
+.page-verdict-content .verdict-meter-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--accent-shadow), var(--accent));
+}
+
+.page-verdict-content .verdict-meter-fill-weak {
+  background: #a9a6aa;
+}
+
+/* A zero-size anchor at the threshold; the wing and label centre on it. */
+.page-verdict-content .verdict-meter-threshold {
+  position: absolute;
+  top: 50%;
+  width: 0;
+  height: 0;
+}
+
+.page-verdict-content .verdict-meter-threshold img {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 50px;
+  width: auto;
+  transform: translate(-50%, -50%) rotate(8deg);
+  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.25));
+}
+
+.page-verdict-content .verdict-meter-threshold span {
+  position: absolute;
+  top: 27px;
+  left: 0;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  font-size: 11px;
+  font-weight: 700;
+  color: #45444a;
+}
+
+.page-verdict-content .verdict-evidence {
+  display: grid;
+  gap: 14px;
+  margin-top: 46px;
+}
+
+.page-verdict-content .verdict-strip-label {
+  margin: 0 0 6px;
+  max-width: none;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: #45444a;
+}
+
+.page-verdict-content .verdict-strip {
+  display: flex;
+  gap: 4px;
+  padding: 6px;
+  border-radius: 10px;
+  background: #111014;
+}
+
+/* Frames shrink on short screens so the page never needs to scroll. */
+.page-verdict-content .verdict-strip svg {
+  flex: 1 1 0;
+  min-width: 0;
+  aspect-ratio: 44 / 64;
+  max-height: clamp(52px, 10vh, 104px);
+  border-radius: 3px;
+}
+
+.page-verdict-content .verdict-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 26px;
+}
+
+.page-verdict-content .verdict-fine {
+  margin: 20px 0 0;
+  max-width: none;
+  font-size: 13px;
+  font-weight: 500;
+  color: #85838a;
+}
+
+.page-verdict-content .verdict-side-title {
+  margin: 0 0 4px;
+  font-size: 22px;
+  font-weight: 700;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.8);
+}
+
+.page-verdict-content .verdict-side-sub {
+  margin: 0 0 16px;
+  font-size: 15px;
+  color: var(--muted);
+}
+
+.page-verdict-content .verdict-lineup {
+  display: grid;
+  gap: 14px;
+}
+
+.page-verdict-content .suspect-card {
+  display: grid;
+  grid-template-columns: 50px 1fr auto;
+  gap: 14px;
+  align-items: center;
+  padding: 12px 16px;
+  border-radius: 14px;
+  background: rgba(54, 53, 58, 0.75);
+  border: 1px solid var(--border);
+  backdrop-filter: blur(6px);
+}
+
+.page-verdict-content .suspect-card-prime {
+  border-color: var(--accent);
+  background: rgba(245, 143, 124, 0.12);
+}
+
+.page-verdict-content .suspect-card-thumb svg {
+  display: block;
+  width: 50px;
+  height: auto;
+  aspect-ratio: 44 / 64;
+  border-radius: 6px;
+}
+
+.page-verdict-content .suspect-card-rank {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.page-verdict-content .suspect-card-id {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--text-h);
+}
+
+.page-verdict-content .suspect-card-dist {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.page-verdict-content .suspect-card-conf {
+  margin: 0;
+  text-align: right;
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--text-h);
+}
+
+.page-verdict-content .suspect-card-conf span {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.page-verdict-content .verdict-trail-title {
+  margin-top: 28px;
+  font-size: 18px;
+}
+
+.page-verdict-content .verdict-trail {
+  margin: 10px 0 0;
+  padding-left: 22px;
+  display: grid;
+  gap: 8px;
+  font-size: 15px;
+  color: var(--muted);
+}
+
+.page-verdict-content .verdict-trail li::marker {
+  color: var(--accent);
+  font-weight: 800;
+}
+
+.page-verdict-content .verdict-trail b {
+  color: var(--text-h);
+}
+
+/* Shorter laptop screens: tighten spacing and drop the "How we got here" list. */
+@media (max-height: 860px) {
+  .page-verdict-content .verdict-bubble {
+    padding: 26px 28px 20px;
+  }
+
+  .page-verdict-content .verdict-suspect-id {
+    font-size: 34px;
+  }
+
+  .page-verdict-content .verdict-evidence {
+    margin-top: 42px;
+  }
+
+  .page-verdict-content .suspect-card {
+    padding: 8px 14px;
+  }
+
+  .page-verdict-content .verdict-duck-gem {
+    height: min(30vh, 250px);
+  }
+
+  .page-verdict-content .verdict-duck-nogem {
+    width: min(11vw, 150px);
+  }
+
+  .page-verdict-content .suspect-card-thumb svg {
+    width: 40px;
+  }
+
+  .page-verdict-content .verdict-trail-title,
+  .page-verdict-content .verdict-trail {
+    display: none;
+  }
+}
+
+/* Phones and narrow windows stack the two columns, so scrolling comes back. */
+@media (max-width: 980px) {
+  .page-verdict-content .verdict-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .page-verdict-content .verdict-stage {
+    overflow-y: auto;
+    padding-right: 32px;
+  }
+
+  .page-verdict-content .verdict-duck {
+    display: none;
+  }
 }
