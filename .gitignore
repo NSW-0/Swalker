@@ -3,10 +3,19 @@ frontend/node_modules/
 frontend/dist/
 
 # Backend (Python, once added)
-backend/__pycache__/
+__pycache__/
 backend/.venv/
 backend/venv/
 *.pyc
+
+# Model weights, uploads and gallery data (never commit these)
+*.pth
+*.pt
+backend/models/
+backend/storage/
+
+# Design mockups (not part of the site)
+mockups/
 
 # Env files
 .env
