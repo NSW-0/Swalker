@@ -1,28 +1,185 @@
-import { useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
+import Button from '@mui/material/Button'
+import CircularProgress from '@mui/material/CircularProgress'
 import Dialog from '@mui/material/Dialog'
+import DialogActions from '@mui/material/DialogActions'
 import DialogTitle from '@mui/material/DialogTitle'
 import DialogContent from '@mui/material/DialogContent'
 import IconButton from '@mui/material/IconButton'
+import TextField from '@mui/material/TextField'
 import CloseIcon from '@mui/icons-material/Close'
 import AddOutlinedIcon from '@mui/icons-material/AddOutlined'
-import { FEATURE_DIM } from '../data/mockGallery'
-import type { GalleryEntry } from '../data/mockGallery'
-import { getArchive } from '../data/archiveStore'
+import UploadFileOutlinedIcon from '@mui/icons-material/UploadFileOutlined'
+import { api, ApiError, checkVideo, formatSize } from '../api/client'
+import type { CaseFile, CaseFileDetail } from '../api/client'
+import { useUploadLimits } from '../api/useUploadLimits'
+import { SilhouetteStrip, SilhouetteThumb } from '../components/verdict/Silhouettes'
 import duckSmoking from '../assets/duck_smoking.png'
 
-function l2Norm(vector: number[]) {
-  return Math.sqrt(vector.reduce((sum, v) => sum + v * v, 0))
+const dialogPaperSx = {
+  background: 'rgba(54, 53, 58, 0.97)',
+  backgroundImage: 'none',
+  border: '1px solid var(--border)',
+  borderRadius: '12px',
+  backdropFilter: 'blur(12px)',
+}
+
+function errorMessage(e: unknown) {
+  return e instanceof Error ? e.message : 'Something went wrong.'
+}
+
+function AddCaseFileDialog({ open, onClose, onAdded }: { open: boolean; onClose: () => void; onAdded: (c: CaseFileDetail) => void }) {
+  const limits = useUploadLimits()
+  const inputRef = useRef<HTMLInputElement>(null)
+  const [name, setName] = useState('')
+  const [clip, setClip] = useState<File | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+
+  const reset = () => {
+    setName('')
+    setClip(null)
+    setError(null)
+  }
+
+  const submit = async () => {
+    if (!clip || name.trim() === '' || busy) return
+    setBusy(true)
+    setError(null)
+    try {
+      const added = await api.addFromVideo(name.trim(), clip)
+      reset()
+      onAdded(added)
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : errorMessage(e))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <Dialog open={open} onClose={() => !busy && onClose()} maxWidth="xs" fullWidth slotProps={{ paper: { sx: dialogPaperSx } }}>
+      <form
+        onSubmit={(e) => {
+          e.preventDefault()
+          void submit()
+        }}
+      >
+        <DialogTitle sx={{ fontWeight: 700 }}>Add Case File</DialogTitle>
+        <DialogContent>
+          <p className="archive-dialog-text">
+            Upload a walking clip of someone new. Swalker keeps their gait signature and a few silhouettes; the
+            video itself is not stored.
+          </p>
+          <TextField
+            autoFocus
+            fullWidth
+            label="Case file name"
+            value={name}
+            onChange={(e) => {
+              setName(e.target.value)
+              setError(null)
+            }}
+            slotProps={{ htmlInput: { maxLength: 40 } }}
+            sx={{ mt: 1, mb: 2 }}
+          />
+          <input
+            ref={inputRef}
+            type="file"
+            accept={['video/*', ...limits.videoExtensions].join(',')}
+            hidden
+            onChange={(e) => {
+              const file = e.target.files?.[0]
+              e.target.value = ''
+              if (!file) return
+              const issue = checkVideo(file, limits)
+              setError(issue)
+              setClip(issue ? null : file)
+            }}
+          />
+          <Button
+            variant="outlined"
+            startIcon={<UploadFileOutlinedIcon />}
+            onClick={() => inputRef.current?.click()}
+            disabled={busy}
+            sx={{ borderRadius: '999px' }}
+          >
+            {clip ? 'Change clip' : 'Choose walking clip'}
+          </Button>
+          {clip && (
+            <p className="archive-dialog-text archive-dialog-file">
+              {clip.name} · {formatSize(clip.size)}
+            </p>
+          )}
+          {busy && (
+            <p className="archive-dialog-text archive-dialog-busy">
+              <CircularProgress size={16} /> Reading the walk… this can take a while on CPU.
+            </p>
+          )}
+          {error && (
+            <p className="archive-dialog-text archive-dialog-error" role="alert">
+              {error}
+            </p>
+          )}
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2.5 }}>
+          <Button onClick={onClose} disabled={busy} sx={{ color: 'var(--muted)' }}>
+            Cancel
+          </Button>
+          <Button type="submit" variant="contained" disabled={!clip || name.trim() === '' || busy} sx={{ borderRadius: '999px', px: 3 }}>
+            {busy ? 'Adding…' : 'Add'}
+          </Button>
+        </DialogActions>
+      </form>
+    </Dialog>
+  )
 }
 
 export default function Archive() {
-  const [entries] = useState(getArchive)
+  const [entries, setEntries] = useState<CaseFile[] | null>(null)
+  const [loadError, setLoadError] = useState<string | null>(null)
+  const [addOpen, setAddOpen] = useState(false)
+
   // /archive?person=person_021 opens that case file straight away
   // (used after saving an unknown walker on the Verdict page).
-  const [searchParams] = useSearchParams()
-  const [selected, setSelected] = useState<GalleryEntry | null>(
-    () => entries.find((e) => e.personId === searchParams.get('person')) ?? null,
-  )
+  const [searchParams, setSearchParams] = useSearchParams()
+  const selectedId = searchParams.get('person')
+  const [detail, setDetail] = useState<CaseFileDetail | null>(null)
+  const [detailError, setDetailError] = useState<string | null>(null)
+  // After back/forward the previous person's details may still be in state; don't show them.
+  const shown = detail?.personId === selectedId ? detail : null
+
+  const load = useCallback(() => {
+    api
+      .gallery()
+      .then((g) => {
+        setEntries(g.entries)
+        setLoadError(null)
+      })
+      .catch((e: unknown) => setLoadError(errorMessage(e)))
+  }, [])
+
+  useEffect(load, [load])
+
+  useEffect(() => {
+    if (!selectedId) return
+    let live = true
+    api
+      .caseFile(selectedId)
+      .then((d) => live && setDetail(d))
+      .catch((e: unknown) => live && setDetailError(errorMessage(e)))
+    return () => {
+      live = false
+    }
+  }, [selectedId])
+
+  const openCase = (personId: string) => {
+    setDetail(null)
+    setDetailError(null)
+    setSearchParams({ person: personId })
+  }
+  const closeCase = () => setSearchParams({})
 
   return (
     <section className="page page-archive-content">
@@ -41,71 +198,80 @@ export default function Archive() {
       </p>
 
       <div className="archive-grid-scroll">
+        {loadError && (
+          <p className="archive-status" role="alert">
+            {loadError}{' '}
+            <Button size="small" onClick={load}>
+              Try again
+            </Button>
+          </p>
+        )}
+        {!entries && !loadError && <p className="archive-status">Opening the filing cabinet…</p>}
+        {entries && entries.length === 0 && (
+          <p className="archive-status">The Archive is empty. Add the first case file to start recognising walkers.</p>
+        )}
         <div className="archive-grid">
-          <button type="button" className="archive-card archive-card-add">
+          <button type="button" className="archive-card archive-card-add" onClick={() => setAddOpen(true)}>
             <AddOutlinedIcon className="archive-card-add-icon" />
             <p className="archive-card-id">Add Case File</p>
           </button>
 
-          {entries.map((entry) => (
-            <button
-              key={entry.personId}
-              type="button"
-              className="archive-card"
-              onClick={() => setSelected(entry)}
-            >
-              <p className="archive-card-id">{entry.personId}</p>
-              <p className="archive-card-hint">View case file →</p>
+          {entries?.map((entry) => (
+            <button key={entry.personId} type="button" className="archive-card archive-card-person" onClick={() => openCase(entry.personId)}>
+              <span className="archive-card-thumb">
+                <SilhouetteThumb src={entry.thumbnailUrl} />
+              </span>
+              <div>
+                <p className="archive-card-id">{entry.personId}</p>
+                <p className="archive-card-hint">View case file →</p>
+              </div>
             </button>
           ))}
         </div>
       </div>
 
-      <Dialog
-        open={selected !== null}
-        onClose={() => setSelected(null)}
-        maxWidth="sm"
-        fullWidth
-        slotProps={{
-          paper: {
-            sx: {
-              background: 'rgba(54, 53, 58, 0.97)',
-              backgroundImage: 'none',
-              border: '1px solid var(--border)',
-              borderRadius: '12px',
-              backdropFilter: 'blur(12px)',
-            },
-          },
-        }}
-      >
-        {selected && (
-          <>
-            <DialogTitle className="archive-dialog-title">
-              {selected.personId}
-              <IconButton
-                onClick={() => setSelected(null)}
-                sx={{ position: 'absolute', right: 12, top: 12, color: 'var(--muted)' }}
-              >
-                <CloseIcon />
-              </IconButton>
-            </DialogTitle>
-            <DialogContent>
+      <Dialog open={selectedId !== null} onClose={closeCase} maxWidth="sm" fullWidth slotProps={{ paper: { sx: dialogPaperSx } }}>
+        <DialogTitle className="archive-dialog-title">
+          {selectedId}
+          <IconButton onClick={closeCase} aria-label="Close" sx={{ position: 'absolute', right: 12, top: 12, color: 'var(--muted)' }}>
+            <CloseIcon />
+          </IconButton>
+        </DialogTitle>
+        <DialogContent>
+          {detailError && <p className="archive-dialog-text archive-dialog-error">{detailError}</p>}
+          {!shown && !detailError && <CircularProgress size={24} />}
+          {shown && (
+            <>
               <p className="archive-detail-row">
                 <span className="archive-detail-label">Video:</span>
-                {selected.videoPath}
+                {shown.videoPath} <span className="archive-detail-note">(not stored)</span>
+              </p>
+              <p className="archive-detail-row">
+                <span className="archive-detail-label">Added:</span>
+                {new Date(shown.addedAt).toLocaleString()}
               </p>
 
+              <SilhouetteStrip frames={shown.silhouetteUrls} className="archive-sil-strip" />
+
               <div className="archive-vector-box">
-                <span className="archive-badge">{FEATURE_DIM}-dim vector</span>
-                <span className="archive-badge">L2 norm {l2Norm(selected.featureVector).toFixed(3)}</span>
-                <p className="archive-vector-preview">
-                  [{selected.featureVector.slice(0, 8).map((v) => v.toFixed(4)).join(', ')}, …]
-                </p>
+                <span className="archive-badge">{shown.featureDim}-dim vector</span>
+                <span className="archive-badge">L2 norm {shown.l2Norm.toFixed(3)}</span>
+                <p className="archive-vector-preview">[{shown.vectorPreview.map((v) => v.toFixed(4)).join(', ')}, …]</p>
               </div>
-            </DialogContent>
-          </>
-        )}
+            </>
+          )}
+        </DialogContent>
       </Dialog>
+
+      <AddCaseFileDialog
+        open={addOpen}
+        onClose={() => setAddOpen(false)}
+        onAdded={(added) => {
+          setAddOpen(false)
+          load()
+          openCase(added.personId)
+        }}
+      />
 
       <img src={duckSmoking} className="archive-duck" alt="" />
     </section>

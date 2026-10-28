@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { Link, Navigate } from 'react-router-dom'
 import Button from '@mui/material/Button'
 import Dialog from '@mui/material/Dialog'
 import DialogTitle from '@mui/material/DialogTitle'
@@ -9,74 +9,133 @@ import TextField from '@mui/material/TextField'
 import Tooltip from '@mui/material/Tooltip'
 import ArchiveOutlinedIcon from '@mui/icons-material/ArchiveOutlined'
 import CheckCircleOutlinedIcon from '@mui/icons-material/CheckCircleOutlined'
+import SearchOutlinedIcon from '@mui/icons-material/SearchOutlined'
 import InvestigationLoader from '../components/verdict/InvestigationLoader'
-import { SilhouetteStrip, SilhouetteThumb } from '../components/verdict/MockSilhouette'
-import { buildMockVerdict, closeness, MATCH_THRESHOLD, SEQ_LEN } from '../data/mockVerdict'
-import type { MockMode, Suspect } from '../data/mockVerdict'
-import { FEATURE_DIM } from '../data/mockGallery'
-import { isNameTaken, nextPersonId, saveToArchive } from '../data/archiveStore'
+import DistanceScale from '../components/verdict/DistanceScale'
+import WalkPlayer, { EmptyCaseFile } from '../components/verdict/WalkPlayer'
+import { SilhouetteThumb } from '../components/verdict/Silhouettes'
+import { api, ApiError, FEATURE_DIM, scalePosition } from '../api/client'
+import type { Suspect, VerdictResult } from '../api/client'
+import { getClue, investigateClue } from '../data/clueStore'
 import duckGem from '../assets/duckGem.png'
-// Web-sized copies: duckNoGem.png is 6.5 MB, wing.png has a lot of empty space.
+// Web-sized copy: duckNoGem.png is 6.5 MB.
 import duckNoGem from '../assets/duckNoGem_web.webp'
-import wingMarker from '../assets/wing_web.png'
 
-// Nothing is computed yet, so the loading screen just runs for a fixed time.
-const LOADING_MS = 3500
-
-function SuspectCard({ suspect, rank, isPrime }: { suspect: Suspect; rank: number; isPrime: boolean }) {
+function SuspectCard({ suspect, rank, threshold, isPrime }: { suspect: Suspect; rank: number; threshold: number; isPrime: boolean }) {
+  const inside = suspect.distance <= threshold
   return (
     <div className={isPrime ? 'suspect-card suspect-card-prime' : 'suspect-card'}>
       <div className="suspect-card-thumb">
-        <SilhouetteThumb id={suspect.personId} />
+        <SilhouetteThumb src={suspect.thumbnailUrl} />
       </div>
-      <div>
+      <div className="suspect-card-body">
         <p className="suspect-card-rank">
           #{rank}
           {isPrime && ' · prime suspect'}
         </p>
-        <p className="suspect-card-id">{suspect.personId}</p>
-        <p className="suspect-card-dist">distance {suspect.distance.toFixed(2)}</p>
+        <p className="suspect-card-id" title={suspect.personId}>
+          {suspect.personId}
+        </p>
+        <div className="suspect-card-bar" aria-hidden="true">
+          <span className={inside ? 'is-inside' : ''} style={{ width: `${(1 - scalePosition(suspect.distance, threshold)) * 100}%` }} />
+          <i />
+        </div>
+        <p className="suspect-card-dist">
+          distance <b>{suspect.distance.toFixed(1)}</b>
+          <span title="Relative between these suspects only, not a probability">
+            {Math.round(suspect.confidence)}% strength
+          </span>
+        </p>
       </div>
-      <p className="suspect-card-conf">
-        {Math.round(suspect.confidence)}%<span>strength</span>
-      </p>
     </div>
   )
 }
 
+function suggestedName(gallerySize: number) {
+  return `person_${String(gallerySize + 1).padStart(3, '0')}`
+}
+
+// Three numbers that explain the decision. For a match, the gap to the runner-up shows how clear it is.
+function verdictFacts(v: VerdictResult, best: Suspect, matched: boolean): [string, string][] {
+  const second = v.suspects[1]
+  if (matched) {
+    return [
+      ['Distance', best.distance.toFixed(1)],
+      ['Match line', String(v.threshold)],
+      ['Lead over #2', second ? (second.distance - best.distance).toFixed(1) : 'no #2'],
+    ]
+  }
+  return [
+    ['Nearest', best.distance.toFixed(1)],
+    ['Match line', String(v.threshold)],
+    ['Past the line by', (best.distance - v.threshold).toFixed(1)],
+  ]
+}
+
+function verdictSentence(v: VerdictResult, best: Suspect | undefined) {
+  if (!best) return 'The Archive is empty, so there is no one to compare this walk with yet.'
+  const apart = best.distance.toFixed(1)
+  if (v.isMatch) {
+    return best.distance <= v.threshold / 2
+      ? `The walks are ${apart} apart, well inside the match line.`
+      : `The walks are ${apart} apart, inside the match line.`
+  }
+  return `The nearest walk, ${best.personId}, is ${apart} away: past the match line at ${v.threshold}.`
+}
+
 export default function Verdict() {
-  const [searchParams] = useSearchParams()
-  // Dev helper until the backend exists. No match is the default for now;
-  // /crime-scene/verdict?mock=match shows the match result.
-  const mode: MockMode = searchParams.get('mock') === 'match' ? 'match' : 'unknown'
-  const verdict = useMemo(() => buildMockVerdict(mode), [mode])
+  const clue = getClue()
+  const [verdict, setVerdict] = useState<VerdictResult | null>(null)
+  const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
 
   // Saving an unknown walker to the Archive
   const [saveOpen, setSaveOpen] = useState(false)
   const [newName, setNewName] = useState('')
+  const [saveError, setSaveError] = useState<string | null>(null)
+  const [saving, setSaving] = useState(false)
   const [savedAs, setSavedAs] = useState<string | null>(null)
   const trimmedName = newName.trim()
-  const nameTaken = trimmedName !== '' && isNameTaken(trimmedName)
+
+  useEffect(() => {
+    if (!clue) return
+    let live = true
+    investigateClue()
+      .then((v) => live && setVerdict(v))
+      .catch((e: unknown) => live && setError(e instanceof Error ? e.message : 'Something went wrong.'))
+    return () => {
+      live = false
+    }
+  }, [clue])
+
+  // Reloaded the page or came here directly: there's no clip to investigate.
+  if (!clue) return <Navigate to="/crime-scene" replace />
 
   const openSaveDialog = () => {
-    setNewName(nextPersonId())
+    if (!verdict) return
+    setNewName(suggestedName(verdict.gallerySize))
+    setSaveError(null)
     setSaveOpen(true)
   }
 
-  const handleSave = () => {
-    if (trimmedName === '' || nameTaken) return
-    saveToArchive({
-      personId: trimmedName,
-      videoPath: `uploads/${verdict.clipName}`,
-      featureVector: verdict.queryVector,
-    })
-    setSavedAs(trimmedName)
-    setSaveOpen(false)
+  const handleSave = async () => {
+    if (!verdict || trimmedName === '' || saving) return
+    setSaving(true)
+    setSaveError(null)
+    try {
+      const saved = await api.saveQuery(trimmedName, verdict.queryId)
+      setSavedAs(saved.personId)
+      setSaveOpen(false)
+    } catch (e) {
+      setSaveError(e instanceof ApiError ? e.message : 'Saving failed.')
+    } finally {
+      setSaving(false)
+    }
   }
 
-  const best = verdict.suspects[0]
-  const thresholdPos = closeness(MATCH_THRESHOLD) * 100
+  const best = verdict?.suspects[0]
+  const clipName = verdict?.clipName ?? clue.name
+  const matched = verdict?.isMatch === true && best !== undefined
 
   return (
     <section className="page page-verdict-content">
@@ -112,112 +171,132 @@ export default function Verdict() {
       </Tooltip>
 
       <div className="verdict-header">
-        <h1 className="verdict-heading">{loading ? 'Investigating…' : 'The Verdict'}</h1>
+        <h1 className="verdict-heading">{loading ? 'Investigating…' : error ? 'Case on hold' : 'The Verdict'}</h1>
         <p className="verdict-caseline">
-          <span className="verdict-tag">CASE #{verdict.caseId}</span>
-          evidence: {verdict.clipName}
-          <span className="verdict-tag">compared against {verdict.gallerySize} case files</span>
+          {verdict && <span className="verdict-tag">CASE #{verdict.caseId}</span>}
+          evidence: {clipName}
+          {verdict && <span className="verdict-tag">compared against {verdict.gallerySize} case files</span>}
         </p>
       </div>
 
       {loading ? (
-        <InvestigationLoader duration={LOADING_MS} onDone={() => setLoading(false)} />
-      ) : (
+        <InvestigationLoader done={verdict !== null || error !== null} onDone={() => setLoading(false)} />
+      ) : error || !verdict ? (
         <div className="verdict-stage">
-          <div className="verdict-grid">
+          <article className="verdict-bubble verdict-error">
+            <span className="verdict-bubble-tab">Case on hold</span>
+            <h2 className="verdict-suspect-id">The trail went cold</h2>
+            <p className="verdict-suspect-sub">{error}</p>
+            <div className="verdict-actions">
+              <Button
+                component={Link}
+                to="/crime-scene"
+                variant="contained"
+                startIcon={<SearchOutlinedIcon />}
+                sx={{ borderRadius: '999px', px: 3, py: 1.25 }}
+              >
+                Back to the Crime Scene
+              </Button>
+            </div>
+          </article>
+          <img src={duckNoGem} className="verdict-duck verdict-duck-nogem" alt="" />
+        </div>
+      ) : (
+        <div className={matched ? 'verdict-stage is-match' : 'verdict-stage is-unknown'}>
+          <div className="verdict-case">
             <article className="verdict-bubble">
-              <span className="verdict-bubble-tab">{verdict.isMatch ? 'Prime suspect' : 'No match'}</span>
+              <span className="verdict-bubble-tab">{matched ? 'Prime suspect' : 'No match'}</span>
 
               <div className="verdict-suspect-head">
                 <div>
-                  <h2 className="verdict-suspect-id">{verdict.isMatch ? best.personId : 'Unknown walker'}</h2>
-                  <p className="verdict-suspect-sub">
-                    {verdict.isMatch ? 'Closest walk in the Archive' : "This walk isn't in the Archive yet."}
-                  </p>
+                  <p className="verdict-kicker">{matched ? 'Identified as' : 'The walker is'}</p>
+                  <h2 className="verdict-suspect-id">{matched ? best.personId : 'Unknown'}</h2>
                 </div>
-                <span className={verdict.isMatch ? 'verdict-stamp' : 'verdict-stamp verdict-stamp-unknown'}>
-                  {verdict.isMatch ? 'Match found' : 'Unidentified'}
+                <span className={matched ? 'verdict-stamp' : 'verdict-stamp verdict-stamp-unknown'}>
+                  {matched ? 'Match found' : savedAs ? 'Case opened' : 'Unidentified'}
                 </span>
               </div>
 
-              <div className="verdict-meter">
-                <div className="verdict-meter-label">
-                  <span>{verdict.isMatch ? 'How close the walks are' : `Closest walk: ${best.personId}`}</span>
-                  <span>distance {best.distance.toFixed(2)}</span>
-                </div>
-                <div className="verdict-meter-track">
-                  <div
-                    className={verdict.isMatch ? 'verdict-meter-fill' : 'verdict-meter-fill verdict-meter-fill-weak'}
-                    style={{ width: `${closeness(best.distance) * 100}%` }}
-                  />
-                  <div className="verdict-meter-threshold" style={{ left: `${thresholdPos}%` }}>
-                    <img src={wingMarker} alt="" />
-                    <span>match line</span>
-                  </div>
-                </div>
-              </div>
+              <p className="verdict-sentence">{verdictSentence(verdict, best)}</p>
 
-              <div className="verdict-evidence">
-                <div>
-                  <p className="verdict-strip-label">The clue · {verdict.clipName}</p>
-                  <SilhouetteStrip id={verdict.isMatch ? best.personId : verdict.clipName} />
-                </div>
-                {verdict.isMatch && (
-                  <div>
-                    <p className="verdict-strip-label">On file · {best.personId}</p>
-                    <SilhouetteStrip id={best.personId} offset={0.3} />
-                  </div>
-                )}
-              </div>
+              {best && <DistanceScale distance={best.distance} threshold={verdict.threshold} isMatch={matched} />}
 
-              {!verdict.isMatch && (
-                <div className="verdict-actions">
-                  {savedAs ? (
-                    <p className="verdict-saved">
-                      <CheckCircleOutlinedIcon fontSize="small" />
-                      Saved to the Archive as <b>{savedAs}</b>
-                      <Link to={`/archive?person=${encodeURIComponent(savedAs)}`}>See it in the Archive →</Link>
+              {best && (
+                <dl className="verdict-facts">
+                  {verdictFacts(verdict, best, matched).map(([label, value]) => (
+                    <div key={label}>
+                      <dt>{label}</dt>
+                      <dd title={value}>{value}</dd>
+                    </div>
+                  ))}
+                </dl>
+              )}
+
+              <p className="verdict-fine">
+                Distance compares the two 4096-number gait signatures: the smaller, the more alike.
+                {!verdict.thresholdCalibrated && ' The match line is provisional until it is calibrated on recorded walks.'}
+              </p>
+            </article>
+
+            <section className="verdict-evidence-panel" aria-label="The evidence">
+              <h2 className="verdict-panel-title">The evidence</h2>
+              <div className="verdict-evidence-pair">
+                <WalkPlayer frames={verdict.querySilhouettes} label="The clue" title={verdict.clipName} />
+                {matched ? (
+                  <WalkPlayer frames={best.silhouetteUrls} label="On file" title={best.personId} />
+                ) : savedAs ? (
+                  <WalkPlayer frames={verdict.querySilhouettes} label="New case file" title={savedAs} />
+                ) : (
+                  <EmptyCaseFile>
+                    <p>
+                      {verdict.gallerySize === 0
+                        ? 'The Archive is empty. Open the first case file so Swalker recognises this walker next time.'
+                        : 'Nobody in the Archive walks like this. Open a case file so Swalker recognises them next time.'}
                     </p>
-                  ) : (
                     <Button
                       variant="contained"
                       startIcon={<ArchiveOutlinedIcon />}
                       onClick={openSaveDialog}
-                      sx={{ borderRadius: '999px', px: 3, py: 1.25 }}
+                      sx={{ borderRadius: '999px', px: 2.5 }}
                     >
-                      Add to the Archive
+                      Open a case file
                     </Button>
-                  )}
-                </div>
-              )}
-
-              <p className="verdict-fine">
-                {verdict.isMatch
-                  ? 'Match strength compares the suspects in the lineup with each other. It is not an absolute certainty.'
-                  : savedAs
-                    ? 'Next time this person walks past a camera, Swalker can recognise them.'
-                    : 'Nobody in the Archive walks close enough to cross the match line. Save this walk so Swalker recognises them next time.'}
-              </p>
-            </article>
-
-            <aside className="verdict-side">
-              <h2 className="verdict-side-title">{verdict.isMatch ? 'The Lineup' : 'Nearest walks'}</h2>
-              <p className="verdict-side-sub">
-                {verdict.isMatch ? 'Top 3 closest walks, ranked by distance' : 'None of these crossed the match line'}
-              </p>
-              <div className="verdict-lineup">
-                {verdict.suspects.map((s, i) => (
-                  <SuspectCard key={s.personId} suspect={s} rank={i + 1} isPrime={verdict.isMatch && i === 0} />
-                ))}
+                  </EmptyCaseFile>
+                )}
               </div>
+              {savedAs && (
+                <p className="verdict-saved">
+                  <CheckCircleOutlinedIcon fontSize="small" />
+                  Saved to the Archive as <b>{savedAs}</b>
+                  <Link to={`/archive?person=${encodeURIComponent(savedAs)}`}>See the case file →</Link>
+                </p>
+              )}
+            </section>
+          </div>
 
-              <h2 className="verdict-side-title verdict-trail-title">How we got here</h2>
+          <div className="verdict-lower">
+            {verdict.suspects.length > 0 && (
+              <section className="verdict-lineup-panel" aria-label={matched ? 'The lineup' : 'Nearest walks'}>
+                <h2 className="verdict-side-title">
+                  {matched ? 'The Lineup' : 'Nearest walks'}
+                  <span>{matched ? 'closest walks, ranked by distance' : 'none of these crossed the match line'}</span>
+                </h2>
+                <div className="verdict-lineup">
+                  {verdict.suspects.map((s, i) => (
+                    <SuspectCard key={s.personId} suspect={s} rank={i + 1} threshold={verdict.threshold} isPrime={matched && i === 0} />
+                  ))}
+                </div>
+              </section>
+            )}
+
+            <section className="verdict-trail-panel" aria-label="How we got here">
+              <h2 className="verdict-side-title">How we got here</h2>
               <ol className="verdict-trail">
                 <li>
-                  <b>1 person</b> spotted in {verdict.framesWithPerson} frames
+                  <b>1 person</b> followed through {verdict.framesWithPerson} of {verdict.framesTotal} frames
                 </li>
                 <li>
-                  <b>{SEQ_LEN} silhouettes</b> sampled from the clip
+                  <b>{verdict.framesUsed} silhouettes</b> read in order
                 </li>
                 <li>
                   <b>{FEATURE_DIM}-number</b> gait signature built
@@ -226,10 +305,10 @@ export default function Verdict() {
                   <b>{verdict.gallerySize} case files</b> compared
                 </li>
               </ol>
-            </aside>
+            </section>
           </div>
 
-          {verdict.isMatch ? (
+          {matched ? (
             <img src={duckGem} className="verdict-duck verdict-duck-gem" alt="" />
           ) : (
             <img src={duckNoGem} className="verdict-duck verdict-duck-nogem" alt="" />
@@ -239,7 +318,7 @@ export default function Verdict() {
 
       <Dialog
         open={saveOpen}
-        onClose={() => setSaveOpen(false)}
+        onClose={() => !saving && setSaveOpen(false)}
         maxWidth="xs"
         fullWidth
         slotProps={{
@@ -256,36 +335,40 @@ export default function Verdict() {
         <form
           onSubmit={(e) => {
             e.preventDefault()
-            handleSave()
+            void handleSave()
           }}
         >
-          <DialogTitle sx={{ fontWeight: 700 }}>Add to the Archive</DialogTitle>
+          <DialogTitle sx={{ fontWeight: 700 }}>Open a case file</DialogTitle>
           <DialogContent>
             <p className="verdict-dialog-text">
-              Open a new case file for this walker. Their walk from {verdict.clipName} is saved under this name.
+              Their gait signature from {clipName} is saved under this name. The video itself is not kept.
             </p>
             <TextField
               autoFocus
               fullWidth
               label="Case file name"
               value={newName}
-              onChange={(e) => setNewName(e.target.value)}
-              error={nameTaken}
-              helperText={nameTaken ? 'A case file with this name already exists.' : ' '}
+              onChange={(e) => {
+                setNewName(e.target.value)
+                setSaveError(null)
+              }}
+              error={saveError !== null}
+              helperText={saveError ?? ' '}
+              slotProps={{ htmlInput: { maxLength: 40 } }}
               sx={{ mt: 1 }}
             />
           </DialogContent>
           <DialogActions sx={{ px: 3, pb: 2.5 }}>
-            <Button onClick={() => setSaveOpen(false)} sx={{ color: 'var(--muted)' }}>
+            <Button onClick={() => setSaveOpen(false)} disabled={saving} sx={{ color: 'var(--muted)' }}>
               Cancel
             </Button>
             <Button
               type="submit"
               variant="contained"
-              disabled={trimmedName === '' || nameTaken}
+              disabled={trimmedName === '' || saving}
               sx={{ borderRadius: '999px', px: 3 }}
             >
-              Save
+              {saving ? 'Saving…' : 'Save'}
             </Button>
           </DialogActions>
         </form>
