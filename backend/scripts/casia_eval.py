@@ -25,16 +25,20 @@ What it reports, for the 50 LT test subjects (075-124 by default):
 
 0. A baseline check first. 'train' mode must reproduce this checkpoint's known Rank-1 under the
    corrected evaluation (--expect, default NM 99.27 / BG 93.26 / CL 72.36, within 0.1 points)
-   in at least one protocol. If it doesn't, the script says so and marks the threshold untrusted:
+   in the 'pooled' protocol. If it doesn't, the script says so and marks the threshold untrusted:
    the harness differs from the training-side evaluation and must be fixed first.
 
 1. Rank-1 for each preprocessing mode: gallery NM 01-04, probes NM 05-06 / BG 01-02 / CL 01-02,
-   in three protocols, since the exact training-side one isn't pinned down here:
-     view-pair mean         OpenGait style, mean over probe x gallery views, identical view excluded
-     per-probe, other views each probe counted once vs gallery at all other views (e.g. 796/1100)
-     per-probe, all views   same, gallery including the probe's own view
-     train  - whole frame resized to 64x44, bilinear, greyscale (how HANDOFF §6.1 describes
-              training; check it against casia_b_loader.py)
+   in three protocols:
+     pooled                 train.py's default (rank1_from_features, protocol='pooled'): each
+                            probe vs every gallery sequence at another view, mean over probe views
+     per-gallery-view       train.py's cross-check / OpenGait style: mean over probe x gallery
+                            view pairs, identical view excluded
+     per-probe, all views   gallery including the probe's own view (closest to the website,
+                            where both clips usually come from the same camera)
+     train  - exactly casia_b_loader.load_silhouette(): PIL convert('L'), whole frame resized to
+              44x64 with PIL BILINEAR (which, unlike OpenCV INTER_LINEAR, averages when shrinking),
+              /255, every frame kept including blank ones
      casia  - the website's default: mask re-framed the CASIA-B way (app/ml/silhouettes.py)
      crop   - the old silhouette_extractor.py tight crop
    If casia is close to train, the website's framing is fine. If it's clearly lower, fix it.
@@ -53,8 +57,8 @@ from collections import deque
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
-import cv2
 import numpy as np
+from PIL import Image
 
 from app.ml.silhouettes import casia_silhouette, crop_silhouette
 
@@ -65,11 +69,10 @@ SEQ_DIR = re.compile(r"^(nm|bg|cl)-(\d{2})$")
 FALSE_MATCH_RATES = (0.001, 0.01, 0.05, 0.10)
 
 
-def train_style(frame: np.ndarray) -> np.ndarray | None:
-    """Whole frame squashed to 64x44, bilinear, greyscale."""
-    if frame.max() == 0:
-        return None
-    return cv2.resize(frame, (44, 64), interpolation=cv2.INTER_LINEAR).astype(np.float32) / 255.0
+def train_style(frame: np.ndarray) -> np.ndarray:
+    """casia_b_loader.load_silhouette(), byte for byte: PIL BILINEAR to 44x64, /255, blanks kept."""
+    img = Image.fromarray(frame).resize((44, 64), Image.BILINEAR)
+    return np.asarray(img, dtype=np.float32) / 255.0
 
 
 def as_mask(frame: np.ndarray) -> np.ndarray:
@@ -127,12 +130,24 @@ def find_sequences(root: Path, subjects: range) -> tuple[list[dict], str]:
     return seqs, f"{layout} at {base}"
 
 
+def decode(path: Path) -> np.ndarray:
+    """Like load_silhouette(): transparent pixels onto black, then PIL greyscale."""
+    img = Image.open(path)
+    if img.mode in ("RGBA", "LA") or (img.mode == "P" and "transparency" in img.info):
+        img = Image.alpha_composite(Image.new("RGBA", img.size, (0, 0, 0, 255)), img.convert("RGBA"))
+    return np.asarray(img.convert("L"), dtype=np.uint8)
+
+
 def read_frames(seq_dir: Path, pool: ThreadPoolExecutor, max_frames: int) -> list[np.ndarray]:
     files = sorted(seq_dir.glob("*.png"))
     if max_frames:
         files = files[:max_frames]
-    frames = pool.map(lambda f: cv2.imread(str(f), cv2.IMREAD_GRAYSCALE), files)
-    return [f for f in frames if f is not None]
+    return list(pool.map(decode, files))
+
+
+# Bumped whenever a mode's output changes, so a resume never mixes old and new features.
+# 2 = train mode via PIL with blank frames kept, empty sequences embedded instead of skipped.
+CACHE_VERSION = 2
 
 
 def load_cache(path: Path, modes: list[str]) -> tuple[dict, list, set]:
@@ -142,6 +157,9 @@ def load_cache(path: Path, modes: list[str]) -> tuple[dict, list, set]:
         return feats, meta, done
     data = np.load(path, allow_pickle=False)
     saved = json.loads(str(data["info"]))
+    if saved.get("version") != CACHE_VERSION:
+        print(f"ignoring {path}: made by an older version of this script, starting over")
+        return feats, meta, done
     if saved["modes"] != modes:
         raise SystemExit(f"{path} was made with modes {saved['modes']}; delete it or pass the same --modes")
     for m in modes:
@@ -150,7 +168,7 @@ def load_cache(path: Path, modes: list[str]) -> tuple[dict, list, set]:
 
 
 def save_cache(path: Path, feats: dict, meta: list, done: set, modes: list[str]) -> None:
-    info = json.dumps({"modes": modes, "meta": meta, "done": sorted(done)})
+    info = json.dumps({"version": CACHE_VERSION, "modes": modes, "meta": meta, "done": sorted(done)})
     arrays = {m: np.stack(v) if v else np.zeros((0, 4096), np.float32) for m, v in feats.items()}
     tmp = path.with_name(path.name + ".tmp.npz")
     np.savez(tmp, info=np.array(info), **arrays)
@@ -161,8 +179,24 @@ def _columns(meta):
     return (np.array([m[k] for m in meta]) for k in ("sid", "cond", "seq", "view"))
 
 
+def rank1_pooled(feats, meta, probe) -> tuple[float, dict]:
+    """train.py rank1_from_features(protocol='pooled'): per probe view, every gallery sequence at
+    another view is a candidate; Rank-1 per probe view, then the mean over probe views."""
+    sid, cond, seq, view = _columns(meta)
+    in_gallery = (cond == GALLERY[0]) & np.isin(seq, GALLERY[1])
+    in_probe = (cond == probe[0]) & np.isin(seq, probe[1])
+    per_view = {}
+    for pv in VIEWS:
+        p, g = in_probe & (view == pv), in_gallery & (view != pv)
+        if p.any() and g.any():
+            d = distances(feats[p], feats[g])
+            per_view[pv] = float((sid[g][d.argmin(axis=1)] == sid[p]).mean())
+    return (float(np.mean(list(per_view.values()))) if per_view else float("nan")), per_view
+
+
 def rank1(feats, meta, probe) -> tuple[float, dict]:
-    """OpenGait-style: mean over probe views of the mean over gallery views != probe view."""
+    """train.py protocol='per_gallery_view': mean over probe views of the mean over gallery views
+    != probe view."""
     sid, cond, seq, view = _columns(meta)
     in_gallery = (cond == GALLERY[0]) & np.isin(seq, GALLERY[1])
     in_probe = (cond == probe[0]) & np.isin(seq, probe[1])
@@ -199,7 +233,6 @@ def rank1_per_probe(feats, meta, probe, exclude_same_view: bool) -> tuple[int, i
 
 
 PROTOCOLS = {
-    "per-probe, other views": lambda f, m, p: rank1_per_probe(f, m, p, exclude_same_view=True),
     "per-probe, all views": lambda f, m, p: rank1_per_probe(f, m, p, exclude_same_view=False),
 }
 
@@ -310,7 +343,7 @@ def main() -> None:
     if done:
         print(f"resuming from {cache}: {len(done)} sequences already done, {len(todo)} to go")
 
-    skipped, wait, work = 0, 0.0, 0.0
+    blank, wait, work = 0, 0.0, 0.0
     start = time.time()
     with ThreadPoolExecutor(args.workers) as files, ThreadPoolExecutor(2) as ahead:
         # Up to 4 sequences are read in the background while the current one is embedded.
@@ -329,20 +362,14 @@ def main() -> None:
             t0 = time.time()
             frames = pending.result()
             t1 = time.time()
-            per_mode = {}
+            blank += not frames  # CASIA-B has a few empty sequence folders
             for mode in args.modes:
                 sils = [x for x in (MODES[mode](f) for f in frames) if x is not None]
-                if not sils:
-                    break
-                per_mode[mode] = embedder.embed(np.stack(sils))
+                # Like CASIABEvalDataset: a sequence with nothing in it is one blank frame, not dropped.
+                feats[mode].append(embedder.embed(np.stack(sils) if sils else np.zeros((1, 64, 44), np.float32)))
+            meta.append({k: s[k] for k in ("sid", "cond", "seq", "view")})
             wait, work = wait + t1 - t0, work + time.time() - t1
             done.add(str(s["dir"]))
-            if len(per_mode) == len(args.modes):
-                for mode, vec in per_mode.items():
-                    feats[mode].append(vec)
-                meta.append({k: s[k] for k in ("sid", "cond", "seq", "view")})
-            else:
-                skipped += 1  # CASIA-B has a few empty or missing sequences
             i += 1
             if i % 250 == 0 or not queue:
                 save_cache(cache, feats, meta, done, args.modes)
@@ -351,22 +378,23 @@ def main() -> None:
                     f"(waiting for disk {wait:.0f}s, preprocessing + model {work:.0f}s)",
                     flush=True,
                 )
-    print(f"embedded {len(meta)} sequences ({skipped} skipped this run) in {time.time() - start:.0f}s")
+    print(f"embedded {len(meta)} sequences ({blank} empty this run) in {time.time() - start:.0f}s")
 
     feats = {m: np.stack(v) for m, v in feats.items()}
     results = {"checkpoint": embedder.checkpoint_name, "subjects": args.subjects, "sequences": len(meta), "rank1": {}}
 
     results["layout"] = layout
-    protocols = {"view-pair mean": None, **PROTOCOLS}
+    means = {"pooled": rank1_pooled, "per-gallery-view": rank1}
+    notes = {"pooled": " (train.py default, the one 99.27 was measured with)"}
+    protocols = {**dict.fromkeys(means), **PROTOCOLS}
     for name, per_probe in protocols.items():
-        note = " (OpenGait style, identical view excluded)" if per_probe is None else ""
-        print(f"\nRank-1 (%), {name}{note}")
+        print(f"\nRank-1 (%), {name}{notes.get(name, '')}")
         print(f"{'mode':8s}" + "".join(f"{c:>16s}" for c in PROBES))
         for mode in args.modes:
             row, cells = {}, []
             for cond, probe in PROBES.items():
                 if per_probe is None:
-                    mean, per_view = rank1(feats[mode], meta, probe)
+                    mean, per_view = means[name](feats[mode], meta, probe)
                     row[cond] = {"pct": mean * 100, "per_view": per_view}
                     cells.append(f"{mean * 100:16.2f}")
                 else:
@@ -383,7 +411,8 @@ def main() -> None:
         hits = [
             name
             for name, rows in results["rank1"].items()
-            if matches_baseline({c: v["pct"] for c, v in rows["train"].items()}, expected, args.tolerance)
+            if name == "pooled"
+            and matches_baseline({c: v["pct"] for c, v in rows["train"].items()}, expected, args.tolerance)
         ]
         harness_ok = bool(hits)
         results["baseline"] = {"expected": expected, "tolerance": args.tolerance, "reproduced_by": hits}
@@ -392,7 +421,7 @@ def main() -> None:
             print(f"\nBASELINE OK: 'train' mode reproduces {want} under: {', '.join(hits)}")
             print("  Compare 'casia' and 'crop' with 'train' in that same protocol.")
         else:
-            print(f"\nBASELINE NOT REPRODUCED: no protocol gives {want} for 'train' mode.")
+            print(f"\nBASELINE NOT REPRODUCED: 'train' mode doesn't give {want} in the pooled protocol.")
             print("  The harness doesn't match the training-side evaluation (preprocessing, protocol or")
             print("  data). Don't use the threshold numbers below; send this output back to fix the script.")
 
