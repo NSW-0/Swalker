@@ -1,4 +1,4 @@
-"""Swalker API. Run from backend/: uvicorn app.main:create_app --factory --port 8000"""
+"""Swalker API. Run from backend/: python -m uvicorn app.main:create_app --factory --port 8000"""
 
 import logging
 from contextlib import asynccontextmanager
