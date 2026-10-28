@@ -118,3 +118,10 @@ def test_clips_at_or_below_target_and_unknown_rates_keep_every_frame():
     assert _kept(25, 25, 100) == list(range(100))
     assert _kept(15, 25, 100) == list(range(100))
     assert _kept(0, 25, 100) == list(range(100))  # OpenCV couldn't read the frame rate
+
+
+def test_casia_applies_the_0_52_horizontal_squash():
+    # A person as wide as they are tall: height -> 50.1% of 64 = 32 px, width -> 32 * 0.52 = 16.6 px.
+    sil = casia_silhouette(person_mask(h=480, w=640, top=100, height=300, width=300, left=150))
+    mass_width = sil.sum(axis=1).max()  # widest row, counting partial edge pixels
+    assert mass_width == pytest.approx(0.501 * 64 * 0.52, abs=1.0)
