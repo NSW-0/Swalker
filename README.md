@@ -5,7 +5,7 @@ Monorepo for the GLTNet gait recognition website (Birzeit University ECE graduat
 ```
 gait-website/
   frontend/   # React 19 + Vite + TypeScript site — see frontend/README.md
-  backend/    # not created yet — will hold the API that talks to the model
+  backend/    # FastAPI + PyTorch service around the model — see backend/README.md
 ```
 
 ## Frontend
@@ -14,6 +14,6 @@ See [`frontend/README.md`](./frontend/README.md) for setup and run instructions.
 
 ## Backend
 
-Not set up yet. When we get to wiring the trained model into the site, a `backend/` folder
-will be added here alongside `frontend/`, kept separate so each half has its own dependencies,
-tooling, and git history if needed.
+See [`backend/README.md`](./backend/README.md). In short: put the weights in `backend/models/`,
+run `uvicorn app.main:create_app --factory --port 8000` from `backend/`, then `npm run dev` in
+`frontend/`.

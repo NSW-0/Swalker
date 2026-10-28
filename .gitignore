@@ -7,6 +7,8 @@ __pycache__/
 backend/.venv/
 backend/venv/
 *.pyc
+.ruff_cache/
+.pytest_cache/
 
 # Model weights, uploads and gallery data (never commit these)
 *.pth
