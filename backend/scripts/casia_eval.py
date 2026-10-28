@@ -10,6 +10,11 @@ Made to run on Kaggle, where CASIA-B and the GPU are. It needs only torch, numpy
         --checkpoint /kaggle/input/datasets/bbiiggnn/gait-checkpoints/stage2_iter70000.pth \\
         --out /kaggle/working/casia_eval.json
 
+Reading CASIA-B's PNGs from /kaggle/input is the slow part (a network drive), so frames are read
+in parallel and the next sequences are read while the current one is embedded. Progress is saved
+to --cache every 250 sequences: if the session dies, run the same command again and it carries on.
+Run it with "Save Version -> Save & Run All" so it keeps going with the browser tab closed.
+
 (If the repo is private, upload the backend/ folder as a Kaggle dataset and cd into it instead.)
 
 Layout is detected, not assumed (like casia_b_loader.py's 'kaggle' / 'kaggle_nested' / 'local'):
@@ -44,6 +49,8 @@ import argparse
 import json
 import re
 import time
+from collections import deque
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import cv2
@@ -118,6 +125,36 @@ def find_sequences(root: Path, subjects: range) -> tuple[list[dict], str]:
                 if vdir.is_dir():
                     seqs.append({"sid": sid, "cond": m[1], "seq": int(m[2]), "view": view, "dir": vdir})
     return seqs, f"{layout} at {base}"
+
+
+def read_frames(seq_dir: Path, pool: ThreadPoolExecutor, max_frames: int) -> list[np.ndarray]:
+    files = sorted(seq_dir.glob("*.png"))
+    if max_frames:
+        files = files[:max_frames]
+    frames = pool.map(lambda f: cv2.imread(str(f), cv2.IMREAD_GRAYSCALE), files)
+    return [f for f in frames if f is not None]
+
+
+def load_cache(path: Path, modes: list[str]) -> tuple[dict, list, set]:
+    """Features embedded by an earlier, interrupted run: (feats, meta, finished sequence dirs)."""
+    feats, meta, done = {m: [] for m in modes}, [], set()
+    if not path.exists():
+        return feats, meta, done
+    data = np.load(path, allow_pickle=False)
+    saved = json.loads(str(data["info"]))
+    if saved["modes"] != modes:
+        raise SystemExit(f"{path} was made with modes {saved['modes']}; delete it or pass the same --modes")
+    for m in modes:
+        feats[m] = list(data[m])
+    return feats, saved["meta"], set(saved["done"])
+
+
+def save_cache(path: Path, feats: dict, meta: list, done: set, modes: list[str]) -> None:
+    info = json.dumps({"modes": modes, "meta": meta, "done": sorted(done)})
+    arrays = {m: np.stack(v) if v else np.zeros((0, 4096), np.float32) for m, v in feats.items()}
+    tmp = path.with_name(path.name + ".tmp.npz")
+    np.savez(tmp, info=np.array(info), **arrays)
+    tmp.replace(path)
 
 
 def _columns(meta):
@@ -244,6 +281,10 @@ def main() -> None:
     )
     parser.add_argument("--tolerance", type=float, default=0.1, help="allowed difference in points (1/1100 = 0.09)")
     parser.add_argument("--out", type=Path, default=Path("casia_eval.json"))
+    parser.add_argument(
+        "--cache", type=Path, default=None, help="resume file (default: next to --out); delete it to start over"
+    )
+    parser.add_argument("--workers", type=int, default=32, help="parallel PNG reads")
     args = parser.parse_args()
     expected = parse_expected(args.expect) if args.expect else {}
 
@@ -263,29 +304,54 @@ def main() -> None:
     embedder = GaitEmbedder(args.checkpoint, device)
     print(f"model: {embedder.checkpoint_name} on {device}")
 
-    feats = {m: [] for m in args.modes}
-    meta, skipped = [], 0
+    cache = args.cache or args.out.with_name(args.out.stem + "_cache.npz")
+    feats, meta, done = load_cache(cache, args.modes)
+    todo = [s for s in seqs if str(s["dir"]) not in done]
+    if done:
+        print(f"resuming from {cache}: {len(done)} sequences already done, {len(todo)} to go")
+
+    skipped, wait, work = 0, 0.0, 0.0
     start = time.time()
-    for i, s in enumerate(seqs):
-        frames = [cv2.imread(str(f), cv2.IMREAD_GRAYSCALE) for f in sorted(s["dir"].glob("*.png"))]
-        frames = [f for f in frames if f is not None]
-        if args.max_frames:
-            frames = frames[: args.max_frames]
-        per_mode = {}
-        for mode in args.modes:
-            sils = [x for x in (MODES[mode](f) for f in frames) if x is not None]
-            if not sils:
+    with ThreadPoolExecutor(args.workers) as files, ThreadPoolExecutor(2) as ahead:
+        # Up to 4 sequences are read in the background while the current one is embedded.
+        queue = deque()
+        upcoming = iter(todo)
+        for s in upcoming:
+            queue.append((s, ahead.submit(read_frames, s["dir"], files, args.max_frames)))
+            if len(queue) == 4:
                 break
-            per_mode[mode] = embedder.embed(np.stack(sils))
-        if len(per_mode) != len(args.modes):
-            skipped += 1  # CASIA-B has a few empty or missing sequences
-            continue
-        for mode, vec in per_mode.items():
-            feats[mode].append(vec)
-        meta.append({k: s[k] for k in ("sid", "cond", "seq", "view")})
-        if (i + 1) % 250 == 0:
-            print(f"  {i + 1}/{len(seqs)}  {time.time() - start:.0f}s")
-    print(f"embedded {len(meta)} sequences ({skipped} skipped) in {time.time() - start:.0f}s")
+        i = 0
+        while queue:
+            s, pending = queue.popleft()
+            nxt = next(upcoming, None)
+            if nxt is not None:
+                queue.append((nxt, ahead.submit(read_frames, nxt["dir"], files, args.max_frames)))
+            t0 = time.time()
+            frames = pending.result()
+            t1 = time.time()
+            per_mode = {}
+            for mode in args.modes:
+                sils = [x for x in (MODES[mode](f) for f in frames) if x is not None]
+                if not sils:
+                    break
+                per_mode[mode] = embedder.embed(np.stack(sils))
+            wait, work = wait + t1 - t0, work + time.time() - t1
+            done.add(str(s["dir"]))
+            if len(per_mode) == len(args.modes):
+                for mode, vec in per_mode.items():
+                    feats[mode].append(vec)
+                meta.append({k: s[k] for k in ("sid", "cond", "seq", "view")})
+            else:
+                skipped += 1  # CASIA-B has a few empty or missing sequences
+            i += 1
+            if i % 250 == 0 or not queue:
+                save_cache(cache, feats, meta, done, args.modes)
+                print(
+                    f"  {len(done)}/{len(seqs)}  {time.time() - start:.0f}s  "
+                    f"(waiting for disk {wait:.0f}s, preprocessing + model {work:.0f}s)",
+                    flush=True,
+                )
+    print(f"embedded {len(meta)} sequences ({skipped} skipped this run) in {time.time() - start:.0f}s")
 
     feats = {m: np.stack(v) for m, v in feats.items()}
     results = {"checkpoint": embedder.checkpoint_name, "subjects": args.subjects, "sequences": len(meta), "rank1": {}}
