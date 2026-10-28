@@ -58,7 +58,7 @@ the background behind each item, see `HANDOFF.md`. For running the backend, see 
   - `embed_video` (determinism check)
   - `calibrate_threshold` (genuine vs impostor distances)
   - `import_gallery_pkl` (import an old `gallery.pkl`)
-- **Quality:** ruff (lint + format) and 66 pytest tests. A new GitHub Actions job,
+- **Quality:** ruff (lint + format) and 70 pytest tests. A new GitHub Actions job,
   `.github/workflows/backend-ci.yml`, runs them on PRs.
 
 ### Frontend (`frontend/`): wired to the real API, mock data removed
@@ -98,18 +98,13 @@ the background behind each item, see `HANDOFF.md`. For running the backend, see 
 
 1. **Record real walking clips** of the team and others: side view, whole body in frame, 3–5 s,
    2–3 clips per person (HANDOFF §7.5).
-2. **Calibrate the match threshold.** A first value can come from `scripts/casia_eval.py` on
-   Kaggle now, without recordings, but only if its baseline check passes. Then run `python -m scripts.calibrate_threshold videos\` on the
-   team's clips to check it, set `SWALKER_MATCH_THRESHOLD` in `backend/.env`, and set
+2. **Calibrate the match threshold.** The first value comes from `scripts/casia_eval.py` on
+   Kaggle, with the `casia_seq_x` threshold table (= the website's `casia_clip`); see
+   `SESSION_NOTES.md` for the exact command. Then run `python -m scripts.calibrate_threshold videos\`
+   on the team's clips to check it, set `SWALKER_MATCH_THRESHOLD` in `backend/.env`, and set
    `SWALKER_THRESHOLD_CALIBRATED=true`. Until then the 30 is a placeholder, and the Verdict page
    says the match line is provisional.
-3. **Run `scripts/casia_eval.py` on Kaggle** (instructions at the top of the script):
-   - It must print `BASELINE OK` first. If it says `BASELINE NOT REPRODUCED`, send the output back:
-     the script's `train` mode or protocol differs from the training-side evaluation.
-   - Then compare Rank-1 of `casia` with `train` in the protocol that reproduced the baseline. If
-     `casia` is clearly lower, the website's framing needs more work (HANDOFF §6.1).
-   - Its threshold table gives the first `SWALKER_MATCH_THRESHOLD`.
-4. **Build the real Archive** from the recorded clips (Archive → "Add Case File").
+3. **Build the real Archive** from the recorded clips (Archive → "Add Case File").
 
 ## Known issues / notes
 - **The site is wider than a phone screen** (every page measures 454 px wide on a 390 px phone).

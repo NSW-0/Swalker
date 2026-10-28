@@ -4,7 +4,9 @@ Gait recognition website for a Birzeit University ECE graduation project. Fronte
 runs on mock data; the backend is the remaining work.
 
 **Read `HANDOFF.md` before starting any task.** It explains the model, the frontend, the API the
-frontend expects, and known problems in the inference scripts.
+frontend expects, and known problems in the inference scripts. Then read `SESSION_NOTES.md`:
+where the last session stopped, the next steps, and lessons learned. Update it before a session
+ends.
 
 ## Commands
 
