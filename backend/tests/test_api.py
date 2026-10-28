@@ -113,3 +113,24 @@ def test_model_not_loaded(settings, monkeypatch):
         assert c.get("/api/health").json()["modelLoaded"] is False
         res = c.post("/api/identify", files=video())
         assert res.status_code == 503 and res.json()["error"] == "model_not_loaded"
+
+
+def test_rename_and_delete_case_files(client):
+    client.post("/api/gallery/from-video", data={"name": "Kareem"}, files=video(b"k"))
+    client.post("/api/gallery/from-video", data={"name": "Nabeel"}, files=video(b"n"))
+
+    renamed = client.patch("/api/gallery/Kareem", json={"name": "Kareem Hamza"})
+    assert renamed.status_code == 200 and renamed.json()["personId"] == "Kareem Hamza"
+    assert len(renamed.json()["silhouetteUrls"]) == 10
+    assert client.get(renamed.json()["silhouetteUrls"][0]).status_code == 200
+    taken = client.patch("/api/gallery/Kareem%20Hamza", json={"name": "nabeel"})
+    assert taken.status_code == 409
+
+    assert client.delete("/api/gallery/Nabeel").status_code == 204
+    assert client.delete("/api/gallery/Nabeel").status_code == 404
+    names = [e["personId"] for e in client.get("/api/gallery").json()["entries"]]
+    assert names == ["Kareem Hamza"]
+
+    # The renamed walker is still recognised under the new name.
+    again = client.post("/api/identify", files=video(b"k")).json()
+    assert again["isMatch"] and again["suspects"][0]["personId"] == "Kareem Hamza"

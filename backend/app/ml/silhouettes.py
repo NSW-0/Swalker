@@ -25,25 +25,55 @@ CASIA_BBOX_TOP = 0.233  # bbox top / frame height
 CASIA_FRAME_H, CASIA_FRAME_W = 240, 320  # CASIA-B's own frame size, so the final resize matches
 
 PERSON_CLASS = 0  # COCO
+CASIA_FPS = 25.0  # CASIA-B videos; the temporal branches learned walking speed at this rate
+
+
+class FrameRateSampler:
+    """Keeps frames so the clip plays at about target_fps, e.g. 60 fps -> every 2nd or 3rd frame.
+
+    The model reads motion between neighbouring frames, so a 60 fps clip fed whole would look like
+    a walk at less than half speed. Clips at or below the target are kept whole (they can't be
+    sped up without inventing frames).
+    """
+
+    def __init__(self, source_fps: float, target_fps: float = CASIA_FPS):
+        # OpenCV reports 0 when a file doesn't say its frame rate: keep everything then.
+        self.step = source_fps / target_fps if source_fps > target_fps * 1.05 else 1.0
+        self._next = 0.0
+
+    def keep(self, index: int) -> bool:
+        if index + 1e-9 < self._next:
+            return False
+        self._next += self.step
+        return True
 
 
 class YoloSegmenter:
-    """YOLOv8-seg, loaded once. Yields one binary person mask (or None) per frame."""
+    """YOLOv8-seg, loaded once. Yields one binary person mask (or None) per kept frame."""
 
-    def __init__(self, weights: Path, device: str):
+    def __init__(self, weights: Path, device: str, target_fps: float = CASIA_FPS):
         from ultralytics import YOLO
 
         self.model = YOLO(str(weights))
         self.device = device
+        self.target_fps = target_fps
 
     def masks(self, video_path: Path) -> Iterator[np.ndarray | None]:
         cap = cv2.VideoCapture(str(video_path))
         if not cap.isOpened():
             raise ApiError("unreadable_video", "The video could not be opened.", 422)
         tracker = WalkerTracker()
+        sampler = FrameRateSampler(cap.get(cv2.CAP_PROP_FPS), self.target_fps)
         try:
+            index = -1
             while True:
-                ok, frame = cap.read()
+                # grab() without decoding is cheap; only kept frames are decoded and segmented.
+                if not cap.grab():
+                    break
+                index += 1
+                if not sampler.keep(index):
+                    continue
+                ok, frame = cap.retrieve()
                 if not ok:
                     break
                 # retina_masks: masks at the frame's own resolution, not the letterboxed

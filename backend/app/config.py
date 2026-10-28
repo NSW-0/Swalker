@@ -24,10 +24,13 @@ class Settings(BaseSettings):
     # Gallery and query must use the same mode; the gallery records which one it was built with.
     preprocess_mode: Literal["casia", "crop"] = "casia"
 
+    # Clips are resampled to this frame rate first (CASIA-B is 25 fps), so a 60 fps phone clip
+    # doesn't look like slow motion to the model.
+    target_fps: float = 25.0
     # Frames fed to the model: consecutive, in order, capped for speed (HANDOFF §6.2).
     max_frames: int = 120
     min_frames: int = 15
-    # Video frames read at most (~15 s at 30 fps). Recordings should be 3-5 s of walking.
+    # Frames read at most, after resampling (~18 s at 25 fps). Recordings should be 3-5 s of walking.
     max_read_frames: int = 450
     # Silhouettes kept for display (Verdict strip, Archive case file). Not fed to the model.
     display_frames: int = 10

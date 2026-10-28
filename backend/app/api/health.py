@@ -14,6 +14,7 @@ def health(state: AppState = Depends(get_state)):
         "loadError": state.load_error,
         "device": state.device,
         "checkpoint": s.checkpoint_path.name,
+        "targetFps": s.target_fps,
         "preprocessMode": s.preprocess_mode,
         "gallerySize": len(state.store),
         "galleryCompatible": state.store.compatible,

@@ -50,7 +50,7 @@ when `models/stage2_iter70000.pth` is present.
 
 Uploaded videos are written to a temp file, processed, and deleted. They are never kept.
 
-If you change `SWALKER_PREPROCESS_MODE` or the checkpoint, the stored vectors no longer compare
+If you change `SWALKER_PREPROCESS_MODE`, `SWALKER_TARGET_FPS` or the checkpoint, the stored vectors no longer compare
 with new ones. The server then reports `galleryCompatible: false` and refuses to match. Move
 `storage/gallery` aside and re-add everyone.
 
@@ -63,6 +63,7 @@ Every setting is optional; see `.env.example` and `app/config.py`. The important
 | `SWALKER_CHECKPOINT_PATH` | `models/stage2_iter70000.pth` | swap in a newer checkpoint here; `n_classes` is read from it |
 | `SWALKER_DEVICE` | `auto` | `cpu` / `cuda` |
 | `SWALKER_PREPROCESS_MODE` | `casia` | `casia` = CASIA-B framing, greyscale (HANDOFF §6.1); `crop` = the old tight crop |
+| `SWALKER_TARGET_FPS` | `25` | clips are resampled to CASIA-B's frame rate first, so 60 fps phone video isn't slow motion to the model |
 | `SWALKER_MAX_FRAMES` | `120` | consecutive frames fed to the model (no subsampling, §6.2) |
 | `SWALKER_MATCH_THRESHOLD` | `30` | **provisional**, see below |
 
@@ -73,16 +74,18 @@ Run them from `backend/` with the venv active.
 | Command | What it does |
 |---|---|
 | `python -m scripts.embed_video clip.mp4 --save-silhouettes out\` | embeds a clip twice: shape, norm, identical? |
+| `python -m scripts.casia_eval --root <CASIA-B> --checkpoint <pth>` | on Kaggle: Rank-1 for `train` / `casia` / `crop` silhouettes (HANDOFF §6.1) plus genuine/impostor distances and a threshold table. Instructions at the top of the script |
 | `python -m scripts.calibrate_threshold videos\` | `videos\<person>\*.mp4`, at least 2 people × 2 clips. Prints genuine/impostor distances and the threshold at several false-match rates |
 | `python -m scripts.import_gallery_pkl gallery.pkl --preprocess-mode crop` | imports an old `gallery.pkl` |
 
 ## Not done yet / not measured
 
-- **Threshold:** 30 is a placeholder. Run `calibrate_threshold` on the team's recordings, put the
-  chosen value in `.env`, and set `SWALKER_THRESHOLD_CALIBRATED=true`. Until then the Verdict
+- **Threshold:** 30 is a placeholder. Get a first value from `casia_eval` on Kaggle, check it with
+  `calibrate_threshold` on the team's recordings, put it in `.env`, and set
+  `SWALKER_THRESHOLD_CALIBRATED=true`. Until then the Verdict
   page says the match line is provisional.
 - **Preprocessing:** `casia` follows HANDOFF §6.1, but its Rank-1 against `crop` on CASIA-B has
-  **not been measured**. The framing numbers in `app/ml/silhouettes.py` come from HANDOFF; replace
+  **not been measured** yet (`casia_eval` does it). The framing numbers in `app/ml/silhouettes.py` come from HANDOFF; replace
   them with `CCPG_MATCH_CASIA_GEOMETRY` from the Kaggle `casia_b_loader.py`.
 - **Progress:** identify is a single synchronous request. Job polling (HANDOFF §7.3) is still to do.
 - `app/ml/combined_glfe_mstfe.py` is a frozen copy pinned to the checkpoint. Don't edit it here.

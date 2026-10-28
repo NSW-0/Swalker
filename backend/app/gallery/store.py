@@ -10,9 +10,10 @@ a few small silhouette PNGs for display, and metadata in index.json. Videos are 
 import json
 import os
 import re
+import shutil
 import threading
 import unicodedata
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, replace
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -31,6 +32,8 @@ class GalleryMeta:
     preprocess_mode: str
     checkpoint: str
     feature_dim: int = FEATURE_DIM
+    # Frame rate clips were resampled to; 0 = made before resampling existed (all frames kept).
+    target_fps: float = 0.0
 
 
 @dataclass
@@ -142,9 +145,15 @@ class GalleryStore:
                     return e, self.features[i]
         return None
 
-    def name_taken(self, name: str) -> bool:
+    def name_taken(self, name: str, ignore: str | None = None) -> bool:
         key = name.casefold()
-        return any(e.personId.casefold() == key for e in self.entries)
+        return any(e.personId.casefold() == key and e.personId != ignore for e in self.entries)
+
+    def _index_of(self, person_id: str) -> int:
+        for i, e in enumerate(self.entries):
+            if e.personId == person_id:
+                return i
+        raise ApiError("not_found", f"No case file named '{person_id}'.", 404)
 
     # ── writing ──────────────────────────────────────────────────────────
 
@@ -185,6 +194,30 @@ class GalleryStore:
             self._persist(entries, features)
             self.entries, self.features = entries, features
             return entry
+
+    def rename(self, person_id: str, new_name: str) -> GalleryEntry:
+        """Only the name changes; the vector and the silhouette folder stay as they are."""
+        new_name = validate_name(new_name)
+        with self._lock:
+            i = self._index_of(person_id)
+            if self.name_taken(new_name, ignore=person_id):
+                raise ApiError("name_taken", f"A case file named '{new_name}' already exists.", 409)
+            entries = list(self.entries)
+            entries[i] = replace(entries[i], personId=new_name)
+            self._persist(entries, self.features)
+            self.entries = entries
+            return entries[i]
+
+    def remove(self, person_id: str) -> None:
+        with self._lock:
+            i = self._index_of(person_id)
+            gone = self.entries[i]
+            entries = self.entries[:i] + self.entries[i + 1 :]
+            features = np.delete(self.features, i, axis=0)
+            self._persist(entries, features)
+            self.entries, self.features = entries, features
+        # After the index no longer mentions it, so a failure here only leaves unused PNGs.
+        shutil.rmtree(self.sil_dir / gone.slug, ignore_errors=True)
 
     def _persist(self, entries: list[GalleryEntry], features: np.ndarray) -> None:
         # features first, index second: the index is what says how many rows are valid.

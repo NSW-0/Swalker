@@ -1,3 +1,5 @@
+import itertools
+
 import cv2
 import numpy as np
 import pytest
@@ -6,6 +8,7 @@ from app.errors import NoPersonError, TooFewFramesError
 from app.ml.silhouettes import (
     CASIA_BBOX_TOP,
     CASIA_PERSON_HEIGHT,
+    FrameRateSampler,
     WalkerTracker,
     casia_silhouette,
     central_window,
@@ -97,3 +100,21 @@ def test_tracker_skips_frames_without_the_walker_then_reacquires():
     for _ in range(WalkerTracker.MAX_MISSES):
         assert tracker.pick(elsewhere, np.array([0.9])) is None
     assert tracker.pick(elsewhere, np.array([0.9])) == 0
+
+
+def _kept(source_fps, target_fps, n):
+    sampler = FrameRateSampler(source_fps, target_fps)
+    return [i for i in range(n) if sampler.keep(i)]
+
+
+def test_high_frame_rate_clips_are_resampled_to_about_25_fps():
+    assert len(_kept(60, 25, 600)) == 250  # 10 s at 60 fps -> 10 s at 25 fps
+    assert len(_kept(30, 25, 300)) == 250
+    kept = _kept(60, 25, 60)
+    assert kept[0] == 0 and all(b > a for a, b in itertools.pairwise(kept))  # in order
+
+
+def test_clips_at_or_below_target_and_unknown_rates_keep_every_frame():
+    assert _kept(25, 25, 100) == list(range(100))
+    assert _kept(15, 25, 100) == list(range(100))
+    assert _kept(0, 25, 100) == list(range(100))  # OpenCV couldn't read the frame rate

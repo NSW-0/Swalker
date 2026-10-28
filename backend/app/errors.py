@@ -1,8 +1,13 @@
-"""Errors the frontend knows how to show. Every error response is {"error": code, "message": text}."""
+"""Errors the frontend knows how to show. Every error response is {"error": code, "message": text}.
 
-from fastapi import FastAPI, Request
-from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
+No FastAPI import at module level: app.ml uses these errors too, and scripts/casia_eval.py runs
+app.ml on Kaggle, where FastAPI isn't installed.
+"""
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from fastapi import FastAPI
 
 
 class ApiError(Exception):
@@ -27,7 +32,11 @@ class TooFewFramesError(ApiError):
         )
 
 
-def register_error_handlers(app: FastAPI) -> None:
+def register_error_handlers(app: "FastAPI") -> None:
+    from fastapi import Request
+    from fastapi.exceptions import RequestValidationError
+    from fastapi.responses import JSONResponse
+
     @app.exception_handler(ApiError)
     async def _api_error(_: Request, exc: ApiError):
         return JSONResponse({"error": exc.code, "message": exc.message}, status_code=exc.status)

@@ -3,8 +3,9 @@
     python -m scripts.import_gallery_pkl gallery.pkl --preprocess-mode crop
 
 The pickle holds no record of how its vectors were made, so --preprocess-mode is required.
-The old scripts used "crop". If that doesn't match the server's SWALKER_PREPROCESS_MODE, the
-server will report the Archive as incompatible and refuse to match against it, by design.
+The old scripts used "crop" and kept every frame (no frame-rate resampling, --target-fps 0).
+If that doesn't match the server's settings, the server will report the Archive as
+incompatible and refuse to match against it, by design.
 Only import pickles you made yourself: unpickling runs code from the file.
 """
 
@@ -24,6 +25,7 @@ def main() -> None:
     parser.add_argument("pkl", type=Path)
     parser.add_argument("--preprocess-mode", required=True, choices=["casia", "crop"])
     parser.add_argument("--checkpoint", default=None, help="checkpoint file name (default: the configured one)")
+    parser.add_argument("--target-fps", type=float, default=0.0, help="frame rate the vectors were made at (0 = all)")
     args = parser.parse_args()
 
     settings = get_settings()
@@ -31,7 +33,7 @@ def main() -> None:
         data = pickle.load(f)  # trusted: a local file made with gallery_builder.py
 
     checkpoint = args.checkpoint or settings.checkpoint_path.name
-    meta = GalleryMeta(preprocess_mode=args.preprocess_mode, checkpoint=checkpoint)
+    meta = GalleryMeta(preprocess_mode=args.preprocess_mode, checkpoint=checkpoint, target_fps=args.target_fps)
     store = GalleryStore(settings.gallery_dir, meta)
     if not store.compatible:
         raise SystemExit(f"existing Archive was built with {store.meta}, not {meta}; import into an empty one")

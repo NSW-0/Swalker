@@ -13,5 +13,5 @@ def build_pipeline() -> GaitPipeline:
     device = resolve_device(settings.device)
     print(f"device={device} checkpoint={settings.checkpoint_path.name} preprocess={settings.preprocess_mode}")
     embedder = GaitEmbedder(settings.checkpoint_path, device)
-    segmenter = YoloSegmenter(settings.yolo_weights, str(device))
+    segmenter = YoloSegmenter(settings.yolo_weights, str(device), settings.target_fps)
     return GaitPipeline(segmenter, embedder, settings)

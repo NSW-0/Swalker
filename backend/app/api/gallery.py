@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, File, Form, UploadFile
+from fastapi import APIRouter, Depends, File, Form, Response, UploadFile
 from pydantic import BaseModel, Field
 
 from app.api.serialize import entry_detail, entry_summary
@@ -25,6 +25,22 @@ def get_case_file(person_id: str, state: AppState = Depends(get_state)):
     if found is None:
         raise ApiError("not_found", f"No case file named '{person_id}'.", 404)
     return entry_detail(*found)
+
+
+class Rename(BaseModel):
+    name: str = Field(max_length=200)
+
+
+@router.patch("/gallery/{person_id}")
+def rename_case_file(person_id: str, body: Rename, state: AppState = Depends(get_state)):
+    entry = state.store.rename(person_id, body.name)
+    return entry_detail(*state.store.find(entry.personId))
+
+
+@router.delete("/gallery/{person_id}", status_code=204)
+def delete_case_file(person_id: str, state: AppState = Depends(get_state)):
+    state.store.remove(person_id)
+    return Response(status_code=204)
 
 
 class SaveQuery(BaseModel):

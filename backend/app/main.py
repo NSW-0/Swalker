@@ -27,7 +27,7 @@ def load_pipeline(state: AppState) -> None:
     try:
         device = resolve_device(s.device)
         embedder = GaitEmbedder(s.checkpoint_path, device)
-        segmenter = YoloSegmenter(s.yolo_weights, str(device))
+        segmenter = YoloSegmenter(s.yolo_weights, str(device), s.target_fps)
         state.pipeline = GaitPipeline(segmenter, embedder, s)
         state.device = str(device)
         log.info("models loaded on %s (%s, preprocess=%s)", device, embedder.checkpoint_name, s.preprocess_mode)
@@ -43,7 +43,11 @@ def create_app(settings: Settings | None = None, pipeline: GaitPipeline | None =
     settings = settings or get_settings()
     store = GalleryStore(
         settings.gallery_dir,
-        GalleryMeta(preprocess_mode=settings.preprocess_mode, checkpoint=settings.checkpoint_path.name),
+        GalleryMeta(
+            preprocess_mode=settings.preprocess_mode,
+            checkpoint=settings.checkpoint_path.name,
+            target_fps=settings.target_fps,
+        ),
     )
     state = AppState(
         settings=settings,
