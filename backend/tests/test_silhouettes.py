@@ -10,6 +10,7 @@ from app.ml.silhouettes import (
     CASIA_PERSON_HEIGHT,
     FrameRateSampler,
     WalkerTracker,
+    casia_sequence,
     casia_silhouette,
     central_window,
     check_enough,
@@ -125,3 +126,33 @@ def test_casia_applies_the_0_52_horizontal_squash():
     sil = casia_silhouette(person_mask(h=480, w=640, top=100, height=300, width=300, left=150))
     mass_width = sil.sum(axis=1).max()  # widest row, counting partial edge pixels
     assert mass_width == pytest.approx(0.501 * 64 * 0.52, abs=1.0)
+
+
+def _cols(sil, level=0.05):
+    return np.flatnonzero(sil.max(axis=0) > level)
+
+
+def test_casia_sequence_keeps_per_frame_size_changes():
+    # Heights 180 / 200 / 220 px: the median (200) becomes 50.1% of the frame, the others stay
+    # 10% smaller / larger instead of all being stretched to the same height.
+    masks = [person_mask(h=480, w=640, top=100, height=hgt, width=50, left=300) for hgt in (180, 200, 220)]
+    sils = casia_sequence(masks)
+    heights = [len(_rows(s)) for s in sils]
+    assert heights[1] / 64 == pytest.approx(CASIA_PERSON_HEIGHT, abs=2 / 64)
+    assert heights[0] < heights[1] < heights[2]
+    assert all(_rows(s)[0] / 64 == pytest.approx(CASIA_BBOX_TOP, abs=2 / 64) for s in sils)  # same top
+
+
+def test_casia_sequence_follow_x_keeps_movement_across_the_frame():
+    masks = [person_mask(h=480, w=640, top=100, height=200, width=50, left=x) for x in (250, 300, 350)]
+    centred = [_cols(s).mean() for s in casia_sequence(masks)]
+    moving = [_cols(s).mean() for s in casia_sequence(masks, follow_x=True)]
+    assert max(centred) - min(centred) < 1
+    assert moving[0] < moving[1] < moving[2] and moving[2] - moving[0] > 4
+
+
+def test_casia_sequence_handles_empty_frames():
+    empty = np.zeros((480, 640), np.uint8)
+    assert casia_sequence([empty, empty]) == [None, None]
+    sils = casia_sequence([empty, person_mask(h=480, w=640, top=100, height=200, width=50, left=300)])
+    assert sils[0] is None and sils[1].shape == (64, 44)

@@ -39,8 +39,12 @@ What it reports, for the 50 LT test subjects (075-124 by default):
      train  - exactly casia_b_loader.load_silhouette(): PIL convert('L'), whole frame resized to
               44x64 with PIL BILINEAR (which, unlike OpenCV INTER_LINEAR, averages when shrinking),
               /255, every frame kept including blank ones
-     casia  - the website's default: mask re-framed the CASIA-B way (app/ml/silhouettes.py)
-     crop   - the old silhouette_extractor.py tight crop
+     casia  - the website's default: each frame's mask re-framed the CASIA-B way
+              (app/ml/silhouettes.py casia_silhouette)
+     casia_seq   - the same framing with one scale and vertical offset per clip, so per-frame
+                   size and height changes survive (casia_sequence), each frame centred
+     casia_seq_x - casia_seq that also keeps the walker's movement across the frame
+     crop   - the old silhouette_extractor.py tight crop (off by default, see DEFAULT_MODES)
    If casia is close to train, the website's framing is fine. If it's clearly lower, fix it.
    The CASIA-B mask stands in for the YOLO mask here; YOLO's own errors are not measured.
 
@@ -61,7 +65,7 @@ from pathlib import Path
 import numpy as np
 from PIL import Image
 
-from app.ml.silhouettes import casia_silhouette, crop_silhouette
+from app.ml.silhouettes import casia_sequence, casia_silhouette, crop_silhouette
 
 VIEWS = [f"{v:03d}" for v in range(0, 181, 18)]
 GALLERY = ("nm", (1, 2, 3, 4))
@@ -80,11 +84,20 @@ def as_mask(frame: np.ndarray) -> np.ndarray:
     return ((frame > 127) * 255).astype(np.uint8)
 
 
+def per_frame(fn):
+    return lambda frames: [fn(f) for f in frames]
+
+
+# Each mode turns a sequence's frames into its silhouettes (None = frame dropped).
 MODES = {
-    "train": train_style,
-    "casia": lambda f: casia_silhouette(as_mask(f)),
-    "crop": lambda f: crop_silhouette(as_mask(f)),
+    "train": per_frame(train_style),
+    "casia": per_frame(lambda f: casia_silhouette(as_mask(f))),
+    "casia_seq": lambda frames: casia_sequence([as_mask(f) for f in frames]),
+    "casia_seq_x": lambda frames: casia_sequence([as_mask(f) for f in frames], follow_x=True),
+    "crop": per_frame(lambda f: crop_silhouette(as_mask(f))),
 }
+# crop was measured on 2026-10-28 (pooled NM 69.45 / BG 41.17 / CL 12.09) and is off by default.
+DEFAULT_MODES = ["train", "casia", "casia_seq", "casia_seq_x"]
 
 
 def detect_layout(root: Path, probe_sid: int) -> tuple[Path, str]:
@@ -165,7 +178,8 @@ def load_cache(path: Path, modes: list[str]) -> tuple[dict, list, set]:
         print(f"ignoring {path}: made by an older version of this script, starting over")
         return feats, meta, done
     if saved["modes"] != modes:
-        raise SystemExit(f"{path} was made with modes {saved['modes']}; delete it or pass the same --modes")
+        print(f"ignoring {path}: made with modes {saved['modes']}, not {modes}; starting over")
+        return feats, meta, done
     for m in modes:
         feats[m] = list(data[m])
     return feats, saved["meta"], set(saved["done"])
@@ -305,7 +319,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--root", type=Path, required=True)
     parser.add_argument("--checkpoint", type=Path, required=True)
-    parser.add_argument("--modes", nargs="+", default=list(MODES), choices=list(MODES))
+    parser.add_argument("--modes", nargs="+", default=DEFAULT_MODES, choices=list(MODES))
     parser.add_argument("--calibrate-mode", default="casia", choices=list(MODES), help="mode used for the threshold")
     parser.add_argument("--subjects", default="75-124", help="test subject range, e.g. 75-124")
     parser.add_argument("--max-frames", type=int, default=0, help="cap frames per sequence (0 = whole sequence)")
@@ -368,7 +382,7 @@ def main() -> None:
             t1 = time.time()
             blank += not frames  # CASIA-B has a few empty sequence folders
             for mode in args.modes:
-                sils = [x for x in (MODES[mode](f) for f in frames) if x is not None]
+                sils = [x for x in MODES[mode](frames) if x is not None]
                 # Like CASIABEvalDataset: a sequence with nothing in it is one blank frame, not dropped.
                 feats[mode].append(embedder.embed(np.stack(sils) if sils else np.zeros((1, 64, 44), np.float32)))
             meta.append({k: s[k] for k in ("sid", "cond", "seq", "view")})
@@ -393,7 +407,7 @@ def main() -> None:
     protocols = {**dict.fromkeys(means), **PROTOCOLS}
     for name, per_probe in protocols.items():
         print(f"\nRank-1 (%), {name}{notes.get(name, '')}")
-        print(f"{'mode':8s}" + "".join(f"{c:>16s}" for c in PROBES))
+        print(f"{'mode':12s}" + "".join(f"{c:>16s}" for c in PROBES))
         for mode in args.modes:
             row, cells = {}, []
             for cond, probe in PROBES.items():
@@ -407,7 +421,7 @@ def main() -> None:
                     row[cond] = {"pct": pct, "correct": correct, "total": total}
                     cells.append(f"{pct:7.2f} {correct:>4d}/{total:<4d}")
             results["rank1"].setdefault(name, {})[mode] = row
-            print(f"{mode:8s}" + "".join(cells))
+            print(f"{mode:12s}" + "".join(cells))
 
     # The harness is trusted only if 'train' mode reproduces the known numbers under some protocol.
     harness_ok = None

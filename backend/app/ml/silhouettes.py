@@ -221,6 +221,59 @@ def casia_silhouette(mask: np.ndarray) -> np.ndarray | None:
     return np.clip(out, 0.0, 1.0)
 
 
+CASIA_CENTRE_X = 0.514  # horizontal centre / frame width (CASIA_REF_GEOMETRY['centroid_x'])
+
+
+def _paste(canvas: np.ndarray, patch: np.ndarray, x0: int, y0: int) -> None:
+    """Paste patch with its top-left corner at (x0, y0), clipped to the canvas."""
+    h, w = patch.shape
+    x1, y1 = max(0, x0), max(0, y0)
+    x2, y2 = min(canvas.shape[1], x0 + w), min(canvas.shape[0], y0 + h)
+    if x1 < x2 and y1 < y2:
+        canvas[y1:y2, x1:x2] = patch[y1 - y0 : y2 - y0, x1 - x0 : x2 - x0]
+
+
+def casia_sequence(masks: list[np.ndarray], follow_x: bool = False) -> list[np.ndarray | None]:
+    """The CASIA-B framing with one scale and one vertical offset for the whole clip.
+
+    casia_silhouette() normalises every frame on its own, which flattens what a fixed camera
+    records: the body's height changing through the stride, the head bobbing, the walker moving
+    across the frame. Here the clip's median person height becomes 50.1% of the frame and its
+    median top lands at 23.3%; each frame keeps its own size and height relative to that.
+    Horizontally each frame is centred at 51.4%, or with follow_x the clip's median centre is,
+    so the walker also moves across the frame as in CASIA-B.
+    """
+    boxes = [_bbox(m) for m in masks]
+    found = np.array([b for b in boxes if b is not None], dtype=np.float64)
+    if found.size == 0:
+        return [None] * len(masks)
+    tops, bottoms, lefts, rights = found.T
+    frame_h, frame_w = IMG_H * SUPERSAMPLE, IMG_W * SUPERSAMPLE
+    sy = frame_h * CASIA_PERSON_HEIGHT / np.median(bottoms - tops)
+    sx = sy * CASIA_SQUASH
+    top_ref, cx_ref = np.median(tops), np.median((lefts + rights) / 2)
+
+    out: list[np.ndarray | None] = []
+    for mask, box in zip(masks, boxes, strict=True):
+        if box is None:
+            out.append(None)
+            continue
+        top, bottom, left, right = box
+        person = mask[top:bottom, left:right].astype(np.float32) / 255.0
+        size = (max(1, round((right - left) * sx)), max(1, round((bottom - top) * sy)))
+        person = cv2.resize(person, size, interpolation=cv2.INTER_AREA)
+        cx = cx_ref if follow_x else (left + right) / 2
+        frame = np.zeros((frame_h, frame_w), np.float32)
+        _paste(
+            frame,
+            person,
+            round(frame_w * CASIA_CENTRE_X + (left - cx) * sx),
+            round(frame_h * CASIA_BBOX_TOP + (top - top_ref) * sy),
+        )
+        out.append(np.clip(cv2.resize(frame, (IMG_W, IMG_H), interpolation=cv2.INTER_AREA), 0.0, 1.0))
+    return out
+
+
 def crop_silhouette(mask: np.ndarray) -> np.ndarray | None:
     """Original silhouette_extractor.py framing: tight crop + 5% padding, hard 0/1."""
     box = _bbox(mask)
