@@ -1,9 +1,9 @@
 """CASIA-B check for the website pipeline: preprocessing Rank-1 (HANDOFF §6.1) + threshold calibration.
 
 Made to run on Kaggle, where CASIA-B and the GPU are. It needs only torch, numpy and OpenCV
-(no FastAPI, no ultralytics). In a Kaggle notebook:
+(no FastAPI, no ultralytics). In a Kaggle notebook (clones main, so merge the eval-progress PR first):
 
-    !git clone https://github.com/NSW-0/Swalker.git    (main, after the eval-progress PR is merged)
+    !git clone https://github.com/NSW-0/Swalker.git
     %cd Swalker/backend
     !python -m scripts.casia_eval \\
         --root /kaggle/input/<casia-b dataset>/<folder with 001..124> \\
