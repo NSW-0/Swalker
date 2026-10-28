@@ -1,31 +1,64 @@
+"""Identify as a job (HANDOFF §7.3): POST starts it and answers at once with a jobId; the Verdict
+loader polls GET /api/identify/{jobId}/status, which reports the real stage until the result is in."""
+
+import logging
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, UploadFile
 
 from app.api.serialize import png_data_url, silhouette_urls, thumbnail_url
-from app.api.uploads import saved_upload
+from app.api.uploads import save_upload
+from app.errors import ApiError
 from app.gallery.matching import is_match, rank
+from app.ml.pipeline import WalkAnalysis
 from app.queries import CachedQuery
 from app.state import AppState, get_state
 
 router = APIRouter()
+log = logging.getLogger("swalker")
 
 
-@router.post("/identify")
-def identify(video: UploadFile = File(...), state: AppState = Depends(get_state)):
-    """Synchronous: on CPU this takes 10-30 s; the Verdict loader keeps animating meanwhile."""
-    pipeline = state.require_pipeline()
+@router.post("/identify", status_code=202)
+def start_identify(video: UploadFile = File(...), state: AppState = Depends(get_state)):
+    # Everything that can be checked straight away fails here, before a job exists.
+    state.require_pipeline()
     state.store.require_compatible()
+    path = save_upload(video, state.settings.max_upload_mb)
+    clip_name = Path(video.filename or "clip").name
+
+    job = state.jobs.create()
+    state.executor.submit(run_identify, state, job.id, path, clip_name)
+    return {"jobId": job.id, "status": job.status}
+
+
+@router.get("/identify/{job_id}/status")
+def identify_status(job_id: str, state: AppState = Depends(get_state)):
+    job = state.jobs.get(job_id)
+    if job is None:
+        raise ApiError("job_not_found", "That investigation isn't running any more. Start it again.", 404)
+    return job.public()
+
+
+def run_identify(state: AppState, job_id: str, path: Path, clip_name: str) -> None:
+    jobs = state.jobs
+    try:
+        walk = state.require_pipeline().analyse(path, report=lambda stage, f: jobs.stage(job_id, stage, f))
+        jobs.stage(job_id, "searching")
+        jobs.finish(job_id, verdict(state, walk, clip_name))
+    except ApiError as exc:
+        jobs.fail(job_id, exc.code, exc.message)
+    except Exception:  # reported to the page as a generic failure; details in the server log
+        log.exception("identify job %s failed", job_id)
+        jobs.fail(job_id, "server_error", "Something went wrong while investigating this clip.")
+    finally:
+        path.unlink(missing_ok=True)  # uploads are never kept
+
+
+def verdict(state: AppState, walk: WalkAnalysis, clip_name: str) -> dict:
     settings = state.settings
-
-    with saved_upload(video, settings.max_upload_mb) as path:
-        walk = pipeline.analyse(path)
-
     entries, features = state.store.snapshot()
     suspects = rank(walk.vector, features, settings.top_k)
-    clip_name = Path(video.filename or "clip").name
     query_id = state.queries.put(CachedQuery(vector=walk.vector, display=walk.display, clip_name=clip_name))
-
     return {
         "caseId": f"{int(query_id[:8], 16) % 10000:04d}",
         "queryId": query_id,

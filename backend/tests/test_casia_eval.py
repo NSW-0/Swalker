@@ -1,7 +1,16 @@
 import numpy as np
 import pytest
 
-from scripts.casia_eval import VIEWS, fmr_table, genuine_impostor, rank1
+from scripts.casia_eval import (
+    VIEWS,
+    find_sequences,
+    fmr_table,
+    genuine_impostor,
+    matches_baseline,
+    parse_expected,
+    rank1,
+    rank1_per_probe,
+)
 
 
 def fake_casia(noise, n_subjects=4, seed=0):
@@ -42,3 +51,36 @@ def test_fmr_table_never_exceeds_the_target_rate():
     for row in fmr_table(genuine, impostor):
         assert row["fmr"] <= row["target_fmr"] + 1e-9
     assert fmr_table(genuine, impostor)[-1]["genuine_accepted"] > 0.99
+
+
+def test_per_probe_counts_and_same_view_exclusion():
+    feats, meta = fake_casia(noise=0.01, n_subjects=3)
+    correct, total = rank1_per_probe(feats, meta, ("cl", (1, 2)), exclude_same_view=True)
+    assert (correct, total) == (3 * 2 * 3, 3 * 2 * 3)  # 3 subjects x 2 seqs x 3 views, all right
+
+
+def test_baseline_check():
+    expected = parse_expected("NM=99.27, bg=93.26,CL=72.36")
+    assert expected == {"NM": 99.27, "BG": 93.26, "CL": 72.36}
+    assert matches_baseline({"NM": 99.27, "BG": 93.18, "CL": 72.36}, expected, tolerance=0.1)
+    assert not matches_baseline({"NM": 99.27, "BG": 92.44, "CL": 72.36}, expected, tolerance=0.1)
+
+
+def _make(root, nested):
+    for sid in (75, 76):
+        base = root / f"{sid:03d}" / (f"{sid:03d}" if nested else "")
+        (base / "nm-01" / "090").mkdir(parents=True)
+
+
+def test_layout_detection_flat_nested_and_wrapped(tmp_path):
+    _make(tmp_path / "flat", nested=False)
+    _make(tmp_path / "nested", nested=True)
+    _make(tmp_path / "wrapped" / "GaitDatasetB-silh", nested=False)
+    seqs, layout = find_sequences(tmp_path / "flat", range(75, 77))
+    assert len(seqs) == 2 and layout.startswith("flat")
+    seqs, layout = find_sequences(tmp_path / "nested", range(75, 77))
+    assert len(seqs) == 2 and layout.startswith("nested")
+    seqs, layout = find_sequences(tmp_path / "wrapped", range(75, 77))
+    assert len(seqs) == 2 and "GaitDatasetB-silh" in layout
+    with pytest.raises(SystemExit):
+        find_sequences(tmp_path / "flat", range(90, 92))

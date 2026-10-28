@@ -15,7 +15,7 @@ import DistanceScale from '../components/verdict/DistanceScale'
 import WalkPlayer, { EmptyCaseFile } from '../components/verdict/WalkPlayer'
 import { SilhouetteThumb } from '../components/verdict/Silhouettes'
 import { api, ApiError, FEATURE_DIM, scalePosition } from '../api/client'
-import type { Suspect, VerdictResult } from '../api/client'
+import type { JobStatus, Suspect, VerdictResult } from '../api/client'
 import { getClue, investigateClue } from '../data/clueStore'
 import duckGem from '../assets/duckGem.png'
 // Web-sized copy: duckNoGem.png is 6.5 MB.
@@ -88,6 +88,7 @@ export default function Verdict() {
   const [verdict, setVerdict] = useState<VerdictResult | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+  const [job, setJob] = useState<JobStatus | null>(null)
 
   // Saving an unknown walker to the Archive
   const [saveOpen, setSaveOpen] = useState(false)
@@ -100,11 +101,13 @@ export default function Verdict() {
   useEffect(() => {
     if (!clue) return
     let live = true
-    investigateClue()
+    const { result, stop } = investigateClue((s) => live && setJob(s))
+    result
       .then((v) => live && setVerdict(v))
       .catch((e: unknown) => live && setError(e instanceof Error ? e.message : 'Something went wrong.'))
     return () => {
       live = false
+      stop()
     }
   }, [clue])
 
@@ -180,7 +183,12 @@ export default function Verdict() {
       </div>
 
       {loading ? (
-        <InvestigationLoader done={verdict !== null || error !== null} onDone={() => setLoading(false)} />
+        <InvestigationLoader
+          done={verdict !== null || error !== null}
+          stage={job?.status ?? null}
+          progress={job?.progress ?? null}
+          onDone={() => setLoading(false)}
+        />
       ) : error || !verdict ? (
         <div className="verdict-stage">
           <article className="verdict-bubble verdict-error">

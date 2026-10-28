@@ -48,9 +48,9 @@ class FakeEmbedder:
 
 
 class FakePipeline(GaitPipeline):
-    def analyse(self, video_path: Path):
+    def analyse(self, video_path: Path, **kwargs):
         self.embedder.next_vector = vector_for(video_path.read_bytes())
-        return super().analyse(video_path)
+        return super().analyse(video_path, **kwargs)
 
 
 @pytest.fixture
@@ -75,3 +75,18 @@ def client(settings):
 
 def video(content: bytes = b"walk-a", name: str = "clip.mp4"):
     return {"video": (name, content, "video/mp4")}
+
+
+def identify(client, content: bytes = b"walk-a", name: str = "clip.mp4") -> dict:
+    """Starts an identify job and polls it like the Verdict page does; returns the final status."""
+    import time
+
+    res = client.post("/api/identify", files=video(content, name))
+    assert res.status_code == 202, res.json()
+    job_id = res.json()["jobId"]
+    for _ in range(1000):
+        status = client.get(f"/api/identify/{job_id}/status").json()
+        if status["status"] in ("done", "error"):
+            return status
+        time.sleep(0.01)
+    raise AssertionError(f"job {job_id} never finished: {status}")

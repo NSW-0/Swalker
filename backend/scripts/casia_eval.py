@@ -1,9 +1,9 @@
 """CASIA-B check for the website pipeline: preprocessing Rank-1 (HANDOFF §6.1) + threshold calibration.
 
 Made to run on Kaggle, where CASIA-B and the GPU are. It needs only torch, numpy and OpenCV
-(no FastAPI, no ultralytics). In a Kaggle notebook:
+(no FastAPI, no ultralytics). In a Kaggle notebook (clones main, so merge the eval-progress PR first):
 
-    !git clone -b nSawafta/backend https://github.com/NSW-0/Swalker.git
+    !git clone https://github.com/NSW-0/Swalker.git
     %cd Swalker/backend
     !python -m scripts.casia_eval \\
         --root /kaggle/input/<casia-b dataset>/<folder with 001..124> \\
@@ -12,13 +12,22 @@ Made to run on Kaggle, where CASIA-B and the GPU are. It needs only torch, numpy
 
 (If the repo is private, upload the backend/ folder as a Kaggle dataset and cd into it instead.)
 
-Expected layout: <root>/<subject>/<cond-seq>/<view>/*.png, e.g. 075/nm-05/090/075-nm-05-090-031.png,
-the standard CASIA-B silhouette release (whole 320x240 frames).
+Layout is detected, not assumed (like casia_b_loader.py's 'kaggle' / 'kaggle_nested' / 'local'):
+<root>/075/nm-05/090/*.png or <root>/075/075/nm-05/090/*.png, with <root> allowed to be up to two
+wrapper folders above the subject folders. Frames are the standard whole 320x240 silhouettes.
 
 What it reports, for the 50 LT test subjects (075-124 by default):
 
-1. Rank-1 for each preprocessing mode, standard protocol: gallery NM 01-04, probes NM 05-06 /
-   BG 01-02 / CL 01-02, all probe views x all other gallery views, identical view excluded.
+0. A baseline check first. 'train' mode must reproduce this checkpoint's known Rank-1 under the
+   corrected evaluation (--expect, default NM 99.27 / BG 93.26 / CL 72.36, within 0.1 points)
+   in at least one protocol. If it doesn't, the script says so and marks the threshold untrusted:
+   the harness differs from the training-side evaluation and must be fixed first.
+
+1. Rank-1 for each preprocessing mode: gallery NM 01-04, probes NM 05-06 / BG 01-02 / CL 01-02,
+   in three protocols, since the exact training-side one isn't pinned down here:
+     view-pair mean         OpenGait style, mean over probe x gallery views, identical view excluded
+     per-probe, other views each probe counted once vs gallery at all other views (e.g. 796/1100)
+     per-probe, all views   same, gallery including the probe's own view
      train  - whole frame resized to 64x44, bilinear, greyscale (how HANDOFF §6.1 describes
               training; check it against casia_b_loader.py)
      casia  - the website's default: mask re-framed the CASIA-B way (app/ml/silhouettes.py)
@@ -67,10 +76,37 @@ MODES = {
 }
 
 
-def find_sequences(root: Path, subjects: range) -> list[dict]:
+def detect_layout(root: Path, probe_sid: int) -> tuple[Path, str]:
+    """Where the subject folders are, and whether each is nested once (<sid>/<sid>/nm-01/...).
+
+    Mirrors the layouts casia_b_loader.py handles: 'local'/'kaggle' = <base>/<sid>/<cond-seq>/<view>,
+    'kaggle_nested' = <base>/<sid>/<sid>/<cond-seq>/<view>. The base may be the given root or a
+    folder up to two levels below it (Kaggle datasets often add a wrapper folder).
+    """
+    name = f"{probe_sid:03d}"
+    candidates = [root, *(p for p in root.iterdir() if p.is_dir())]
+    candidates += [q for p in candidates[1:] for q in p.iterdir() if q.is_dir()]
+    for base in candidates:
+        sdir = base / name
+        if not sdir.is_dir():
+            continue
+        if any(SEQ_DIR.match(c.name) for c in sdir.iterdir() if c.is_dir()):
+            return base, "flat"
+        if (sdir / name).is_dir() and any(SEQ_DIR.match(c.name) for c in (sdir / name).iterdir()):
+            return base, "nested"
+    raise SystemExit(
+        f"couldn't find subject {name} under {root} (looked for {name}/nm-01/000/*.png and "
+        f"{name}/{name}/nm-01/000/*.png, up to two folders deep)"
+    )
+
+
+def find_sequences(root: Path, subjects: range) -> tuple[list[dict], str]:
+    base, layout = detect_layout(root, subjects.start)
     seqs = []
     for sid in subjects:
-        sdir = root / f"{sid:03d}"
+        sdir = base / f"{sid:03d}"
+        if layout == "nested":
+            sdir = sdir / f"{sid:03d}"
         if not sdir.is_dir():
             continue
         for cdir in sorted(sdir.iterdir()):
@@ -81,15 +117,16 @@ def find_sequences(root: Path, subjects: range) -> list[dict]:
                 vdir = cdir / view
                 if vdir.is_dir():
                     seqs.append({"sid": sid, "cond": m[1], "seq": int(m[2]), "view": view, "dir": vdir})
-    return seqs
+    return seqs, f"{layout} at {base}"
 
 
-def rank1(feats, meta, probe, max_gallery_views=None) -> tuple[float, dict]:
-    """Mean Rank-1 over probe views, each averaged over gallery views != probe view."""
-    sid = np.array([m["sid"] for m in meta])
-    cond = np.array([m["cond"] for m in meta])
-    seq = np.array([m["seq"] for m in meta])
-    view = np.array([m["view"] for m in meta])
+def _columns(meta):
+    return (np.array([m[k] for m in meta]) for k in ("sid", "cond", "seq", "view"))
+
+
+def rank1(feats, meta, probe) -> tuple[float, dict]:
+    """OpenGait-style: mean over probe views of the mean over gallery views != probe view."""
+    sid, cond, seq, view = _columns(meta)
     in_gallery = (cond == GALLERY[0]) & np.isin(seq, GALLERY[1])
     in_probe = (cond == probe[0]) & np.isin(seq, probe[1])
 
@@ -110,6 +147,34 @@ def rank1(feats, meta, probe, max_gallery_views=None) -> tuple[float, dict]:
     return (float(np.mean(list(per_view.values()))) if per_view else float("nan")), per_view
 
 
+def rank1_per_probe(feats, meta, probe, exclude_same_view: bool) -> tuple[int, int]:
+    """Each probe sequence counted once against the whole NM 01-04 gallery (correct, total),
+    e.g. 796/1100. With exclude_same_view, gallery sequences at the probe's own view are left out."""
+    sid, cond, seq, view = _columns(meta)
+    gal = (cond == GALLERY[0]) & np.isin(seq, GALLERY[1])
+    prb = np.flatnonzero((cond == probe[0]) & np.isin(seq, probe[1]))
+    if prb.size == 0:
+        return 0, 0
+    d = distances(feats[prb], feats[gal])
+    if exclude_same_view:
+        d[view[prb][:, None] == view[gal][None, :]] = np.inf
+    return int((sid[gal][d.argmin(axis=1)] == sid[prb]).sum()), int(prb.size)
+
+
+PROTOCOLS = {
+    "per-probe, other views": lambda f, m, p: rank1_per_probe(f, m, p, exclude_same_view=True),
+    "per-probe, all views": lambda f, m, p: rank1_per_probe(f, m, p, exclude_same_view=False),
+}
+
+
+def parse_expected(text: str) -> dict[str, float]:
+    return {k.strip().upper(): float(v) for k, v in (part.split("=") for part in text.split(","))}
+
+
+def matches_baseline(row: dict[str, float], expected: dict[str, float], tolerance: float) -> bool:
+    return all(abs(row[c] - expected[c]) <= tolerance for c in expected)
+
+
 def distances(a: np.ndarray, b: np.ndarray) -> np.ndarray:
     a, b = a.astype(np.float64), b.astype(np.float64)
     sq = (a * a).sum(1)[:, None] + (b * b).sum(1)[None, :] - 2 * a @ b.T
@@ -118,10 +183,7 @@ def distances(a: np.ndarray, b: np.ndarray) -> np.ndarray:
 
 def genuine_impostor(feats, meta, views=VIEWS) -> tuple[np.ndarray, np.ndarray]:
     """NM probe vs NM gallery distances at the same view."""
-    sid = np.array([m["sid"] for m in meta])
-    cond = np.array([m["cond"] for m in meta])
-    seq = np.array([m["seq"] for m in meta])
-    view = np.array([m["view"] for m in meta])
+    sid, cond, seq, view = _columns(meta)
     gal = (cond == "nm") & np.isin(seq, GALLERY[1])
     prb = (cond == "nm") & np.isin(seq, PROBES["NM"][1])
     genuine, impostor = [], []
@@ -175,20 +237,27 @@ def main() -> None:
     parser.add_argument("--max-frames", type=int, default=0, help="cap frames per sequence (0 = whole sequence)")
     parser.add_argument("--limit", type=int, default=0, help="only the first N sequences (quick smoke test)")
     parser.add_argument("--device", default="cuda")
+    parser.add_argument(
+        "--expect",
+        default="NM=99.27,BG=93.26,CL=72.36",
+        help="known Rank-1 (%%) of this checkpoint under the corrected eval; 'train' mode must reproduce it",
+    )
+    parser.add_argument("--tolerance", type=float, default=0.1, help="allowed difference in points (1/1100 = 0.09)")
     parser.add_argument("--out", type=Path, default=Path("casia_eval.json"))
     args = parser.parse_args()
+    expected = parse_expected(args.expect) if args.expect else {}
 
     import torch
 
     from app.ml.embed import GaitEmbedder
 
     lo, hi = (int(x) for x in args.subjects.split("-"))
-    seqs = find_sequences(args.root, range(lo, hi + 1))
+    seqs, layout = find_sequences(args.root, range(lo, hi + 1))
     if not seqs:
         raise SystemExit(f"no sequences under {args.root} (expected <root>/075/nm-01/000/*.png)")
     if args.limit:
         seqs = seqs[: args.limit]
-    print(f"{len(seqs)} sequences, subjects {lo}-{hi}, modes {args.modes}")
+    print(f"{len(seqs)} sequences, subjects {lo}-{hi}, layout {layout}, modes {args.modes}")
 
     device = torch.device(args.device if torch.cuda.is_available() or args.device == "cpu" else "cpu")
     embedder = GaitEmbedder(args.checkpoint, device)
@@ -221,15 +290,45 @@ def main() -> None:
     feats = {m: np.stack(v) for m, v in feats.items()}
     results = {"checkpoint": embedder.checkpoint_name, "subjects": args.subjects, "sequences": len(meta), "rank1": {}}
 
-    print("\nRank-1 (%), identical view excluded")
-    print(f"{'mode':8s}" + "".join(f"{c:>8s}" for c in PROBES))
-    for mode in args.modes:
-        row = {}
-        for cond, probe in PROBES.items():
-            mean, per_view = rank1(feats[mode], meta, probe)
-            row[cond] = {"mean": mean, "per_view": per_view}
-        results["rank1"][mode] = row
-        print(f"{mode:8s}" + "".join(f"{row[c]['mean'] * 100:8.2f}" for c in PROBES))
+    results["layout"] = layout
+    protocols = {"view-pair mean": None, **PROTOCOLS}
+    for name, per_probe in protocols.items():
+        note = " (OpenGait style, identical view excluded)" if per_probe is None else ""
+        print(f"\nRank-1 (%), {name}{note}")
+        print(f"{'mode':8s}" + "".join(f"{c:>16s}" for c in PROBES))
+        for mode in args.modes:
+            row, cells = {}, []
+            for cond, probe in PROBES.items():
+                if per_probe is None:
+                    mean, per_view = rank1(feats[mode], meta, probe)
+                    row[cond] = {"pct": mean * 100, "per_view": per_view}
+                    cells.append(f"{mean * 100:16.2f}")
+                else:
+                    correct, total = per_probe(feats[mode], meta, probe)
+                    pct = 100 * correct / total if total else float("nan")
+                    row[cond] = {"pct": pct, "correct": correct, "total": total}
+                    cells.append(f"{pct:7.2f} {correct:>4d}/{total:<4d}")
+            results["rank1"].setdefault(name, {})[mode] = row
+            print(f"{mode:8s}" + "".join(cells))
+
+    # The harness is trusted only if 'train' mode reproduces the known numbers under some protocol.
+    harness_ok = None
+    if expected and "train" in args.modes:
+        hits = [
+            name
+            for name, rows in results["rank1"].items()
+            if matches_baseline({c: v["pct"] for c, v in rows["train"].items()}, expected, args.tolerance)
+        ]
+        harness_ok = bool(hits)
+        results["baseline"] = {"expected": expected, "tolerance": args.tolerance, "reproduced_by": hits}
+        want = ", ".join(f"{k} {v:.2f}" for k, v in expected.items())
+        if hits:
+            print(f"\nBASELINE OK: 'train' mode reproduces {want} under: {', '.join(hits)}")
+            print("  Compare 'casia' and 'crop' with 'train' in that same protocol.")
+        else:
+            print(f"\nBASELINE NOT REPRODUCED: no protocol gives {want} for 'train' mode.")
+            print("  The harness doesn't match the training-side evaluation (preprocessing, protocol or")
+            print("  data). Don't use the threshold numbers below; send this output back to fix the script.")
 
     if args.calibrate_mode in feats:
         f = feats[args.calibrate_mode]
@@ -249,7 +348,9 @@ def main() -> None:
             print("  threshold   false-match   genuine accepted")
             for r in calib[label]["table"]:
                 print(f"  {r['threshold']:9.2f}   {r['fmr']:9.2%}   {r['genuine_accepted']:9.2%}")
-        results["threshold"] = {"mode": args.calibrate_mode, **calib}
+        results["threshold"] = {"mode": args.calibrate_mode, "trusted": harness_ok is True, **calib}
+        if harness_ok is not True:
+            print("\n(threshold numbers above are UNTRUSTED: the baseline check did not pass or did not run)")
 
     args.out.write_text(json.dumps(results, indent=2, default=float))
     print(f"\nsaved {args.out}")

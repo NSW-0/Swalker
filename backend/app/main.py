@@ -11,7 +11,9 @@ from app.api import gallery, health, identify
 from app.config import Settings, get_settings
 from app.errors import register_error_handlers
 from app.gallery.store import GalleryMeta, GalleryStore
+from app.jobs import JobStore
 from app.ml.pipeline import GaitPipeline
+from app.ml.silhouettes import PREPROCESS_VERSIONS
 from app.queries import QueryCache
 from app.state import AppState
 
@@ -47,12 +49,14 @@ def create_app(settings: Settings | None = None, pipeline: GaitPipeline | None =
             preprocess_mode=settings.preprocess_mode,
             checkpoint=settings.checkpoint_path.name,
             target_fps=settings.target_fps,
+            preprocess_version=PREPROCESS_VERSIONS[settings.preprocess_mode],
         ),
     )
     state = AppState(
         settings=settings,
         store=store,
         queries=QueryCache(settings.query_ttl_minutes * 60),
+        jobs=JobStore(settings.query_ttl_minutes * 60),
         pipeline=pipeline,
         device="injected" if pipeline else "unknown",
     )
@@ -69,6 +73,7 @@ def create_app(settings: Settings | None = None, pipeline: GaitPipeline | None =
         if state.pipeline is None:
             load_pipeline(state)
         yield
+        state.executor.shutdown(wait=False, cancel_futures=True)
 
     app = FastAPI(title="Swalker API", lifespan=lifespan)
     app.state.swalker = state

@@ -11,9 +11,11 @@ the background behind each item, see `HANDOFF.md`. For running the backend, see 
   Only `feat` is used. YOLOv8n-seg also loads once. If loading fails, the API still starts and
   `/api/health` says why.
 - **Video to silhouettes**, rebuilt from the old `silhouette_extractor.py`:
-  - CASIA-B style framing by default: the person fills ~50% of the height on a 320×240 canvas,
-    with greyscale kept (HANDOFF §6.1). The old tight crop is still available as
-    `SWALKER_PREPROCESS_MODE=crop`.
+  - CASIA-B style framing by default, ported from the training code's
+    `CCPG_MATCH_CASIA_GEOMETRY`: crop to the person, height 50.1% of the frame, width squashed
+    by 0.52, bbox top at 23.3%, greyscale kept (HANDOFF §6.1). The spec doesn't fix the
+    horizontal position, so the person is centred. The old tight crop is still available as
+    `SWALKER_PREPROCESS_MODE=crop`. The Archive records the framing version.
   - Frames are fed in order and consecutive, up to 120. No more spreading 30 frames across the
     clip (§6.2).
   - **Walker tracking:** the same person is followed across frames by box overlap. Before, each
@@ -33,7 +35,9 @@ the background behind each item, see `HANDOFF.md`. For running the backend, see 
   - `GET /api/health`
   - `GET /api/gallery`
   - `GET /api/gallery/{id}`
-  - `POST /api/identify`
+  - `POST /api/identify` starts a job and returns a `jobId` straight away;
+    `GET /api/identify/{jobId}/status` reports `queued | detecting | silhouettes | embedding |
+    searching | done | error` with overall progress, and the result when done (HANDOFF §7.3)
   - `POST /api/gallery` (save a walker by `queryId`, no re-upload)
   - `POST /api/gallery/from-video`
 
@@ -42,12 +46,15 @@ the background behind each item, see `HANDOFF.md`. For running the backend, see 
 - **Archive editing:** `PATCH /api/gallery/{id}` renames (the vector and silhouettes stay),
   `DELETE /api/gallery/{id}` removes the vector, the entry and its silhouettes.
 - **Scripts:**
-  - `casia_eval`, for Kaggle: Rank-1 for each preprocessing mode on the CASIA-B test set, plus
-    genuine/impostor distances and a threshold table (checked locally on a tiny fake dataset only)
+  - `casia_eval`, for Kaggle: first checks that `train` mode reproduces the known baseline
+    (NM 99.27 / BG 93.26 / CL 72.36) and marks the threshold untrusted if not; then Rank-1 for each
+    preprocessing mode in three protocols (with counts like 796/1100), genuine/impostor distances
+    and a threshold table. Detects flat, nested and wrapped dataset layouts. Checked locally on a
+    tiny fake dataset only; **not yet run on real CASIA-B**
   - `embed_video` (determinism check)
   - `calibrate_threshold` (genuine vs impostor distances)
   - `import_gallery_pkl` (import an old `gallery.pkl`)
-- **Quality:** ruff (lint + format) and 56 pytest tests. A new GitHub Actions job,
+- **Quality:** ruff (lint + format) and 66 pytest tests. A new GitHub Actions job,
   `.github/workflows/backend-ci.yml`, runs them on PRs.
 
 ### Frontend (`frontend/`): wired to the real API, mock data removed
@@ -56,7 +63,8 @@ the background behind each item, see `HANDOFF.md`. For running the backend, see 
 - **Crime Scene:** a real video picker that shows the file name and size and checks type and size
   before uploading.
 - **Verdict:**
-  - The loader waits for the real answer (at least 3.5 s).
+  - The loader follows the real job: its four labels track the server's stages (each shown at
+    least ~0.45 s so they're readable) and the ring follows the reported progress; at least 3.5 s.
   - Error screen for failed investigations.
   - Real silhouettes.
   - "Open a case file" saves an unknown walker.
@@ -71,6 +79,7 @@ the background behind each item, see `HANDOFF.md`. For running the backend, see 
 - **Archive:** loads from the server, with loading, empty and error states. Case file dialog shows
   silhouettes, the vector preview, L2 norm and date. **"Add Case File" works** (name + video upload).
   Case files can be **renamed** and **deleted** (delete asks to confirm inside the dialog).
+- **About page** shows the corrected accuracy: NM 99.27%, BG 93.26%, CL 72.36%.
 - `vite.config.ts` proxies `/api` to `localhost:8000`.
 
 ### Checked so far
@@ -86,19 +95,17 @@ the background behind each item, see `HANDOFF.md`. For running the backend, see 
 1. **Record real walking clips** of the team and others: side view, whole body in frame, 3–5 s,
    2–3 clips per person (HANDOFF §7.5).
 2. **Calibrate the match threshold.** A first value can come from `scripts/casia_eval.py` on
-   Kaggle now, without recordings. Then run `python -m scripts.calibrate_threshold videos\` on the
+   Kaggle now, without recordings, but only if its baseline check passes. Then run `python -m scripts.calibrate_threshold videos\` on the
    team's clips to check it, set `SWALKER_MATCH_THRESHOLD` in `backend/.env`, and set
    `SWALKER_THRESHOLD_CALIBRATED=true`. Until then the 30 is a placeholder, and the Verdict page
    says the match line is provisional.
-3. **Measure the preprocessing (§6.1).** Run `scripts/casia_eval.py` on Kaggle (instructions in the
-   script) and compare Rank-1 for `train` vs `casia` vs `crop`. If `casia` is clearly below
-   `train`, the website's framing needs fixing. Also replace the framing numbers in
-   `backend/app/ml/silhouettes.py` with `CCPG_MATCH_CASIA_GEOMETRY` from the newest
-   `casia_b_loader.py`. Changing the mode means rebuilding the Archive.
+3. **Run `scripts/casia_eval.py` on Kaggle** (instructions at the top of the script):
+   - It must print `BASELINE OK` first. If it says `BASELINE NOT REPRODUCED`, send the output back:
+     the script's `train` mode or protocol differs from the training-side evaluation.
+   - Then compare Rank-1 of `casia` with `train` in the protocol that reproduced the baseline. If
+     `casia` is clearly lower, the website's framing needs more work (HANDOFF §6.1).
+   - Its threshold table gives the first `SWALKER_MATCH_THRESHOLD`.
 4. **Build the real Archive** from the recorded clips (Archive → "Add Case File").
-5. **Real progress on the loader (§7.3).** Identify is one synchronous request (10–30 s on CPU).
-   Add a job id plus polling or SSE so the four loader steps follow the real pipeline.
-6. **About page:** decide whether to show the original or the re-measured accuracy numbers (§4).
 
 ## Known issues / notes
 - **The site is wider than a phone screen** (every page measures 454 px wide on a 390 px phone).

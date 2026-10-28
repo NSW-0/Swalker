@@ -34,6 +34,8 @@ class GalleryMeta:
     feature_dim: int = FEATURE_DIM
     # Frame rate clips were resampled to; 0 = made before resampling existed (all frames kept).
     target_fps: float = 0.0
+    # Version of the preprocess_mode's framing (silhouettes.PREPROCESS_VERSIONS); 1 = the first one.
+    preprocess_version: int = 1
 
 
 @dataclass

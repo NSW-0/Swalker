@@ -1,7 +1,14 @@
 from fastapi.testclient import TestClient
 
 from app.main import create_app
-from tests.conftest import video
+from tests.conftest import identify, video
+
+
+def result(client, content=b"walk-a", name="clip.mp4") -> dict:
+    status = identify(client, content, name)
+    assert status["status"] == "done", status
+    assert status["progress"] == 1.0
+    return status["result"]
 
 
 def test_health(client):
@@ -13,10 +20,20 @@ def test_health(client):
     assert ".mp4" in body["videoExtensions"]
 
 
-def test_identify_on_empty_archive_is_unknown(client):
+def test_identify_starts_a_job_and_reports_status(client):
     res = client.post("/api/identify", files=video())
-    assert res.status_code == 200
-    body = res.json()
+    assert res.status_code == 202
+    assert res.json()["status"] == "queued" and len(res.json()["jobId"]) == 32
+    status = client.get(f"/api/identify/{res.json()['jobId']}/status")
+    assert status.status_code == 200
+    assert status.json()["status"] in ("queued", "detecting", "silhouettes", "embedding", "searching", "done")
+
+    missing = client.get("/api/identify/nope/status")
+    assert missing.status_code == 404 and missing.json()["error"] == "job_not_found"
+
+
+def test_identify_on_empty_archive_is_unknown(client):
+    body = result(client)
     assert body["isMatch"] is False and body["suspects"] == []
     assert body["framesWithPerson"] == 40 and body["framesUsed"] == 30
     assert len(body["querySilhouettes"]) == 10
@@ -25,32 +42,32 @@ def test_identify_on_empty_archive_is_unknown(client):
 
 
 def test_unknown_walker_saved_then_recognised(client):
-    first = client.post("/api/identify", files=video(b"walk-nabeel", "a.mp4")).json()
+    first = result(client, b"walk-nabeel", "a.mp4")
     saved = client.post("/api/gallery", json={"name": "Nabeel", "queryId": first["queryId"]})
     assert saved.status_code == 201
     assert saved.json()["videoPath"] == "a.mp4"
     assert len(saved.json()["silhouetteUrls"]) == 10
 
-    again = client.post("/api/identify", files=video(b"walk-nabeel", "b.mp4")).json()
+    again = result(client, b"walk-nabeel", "b.mp4")
     assert again["isMatch"] is True
     assert again["suspects"][0]["personId"] == "Nabeel"
     assert again["suspects"][0]["distance"] == 0.0
     assert again["suspects"][0]["thumbnailUrl"].startswith("/api/media/")
     assert client.get(again["suspects"][0]["thumbnailUrl"]).headers["content-type"] == "image/png"
 
-    stranger = client.post("/api/identify", files=video(b"walk-someone-else")).json()
+    stranger = result(client, b"walk-someone-else")
     assert stranger["isMatch"] is False
     assert stranger["suspects"][0]["personId"] == "Nabeel"  # nearest, but past the match line
 
 
 def test_save_errors(client):
-    qid = client.post("/api/identify", files=video()).json()["queryId"]
+    qid = result(client)["queryId"]
     assert client.post("/api/gallery", json={"name": "Ahmad", "queryId": qid}).status_code == 201
 
     expired = client.post("/api/gallery", json={"name": "Other", "queryId": qid})  # used up
     assert expired.status_code == 404 and expired.json()["error"] == "query_expired"
 
-    qid2 = client.post("/api/identify", files=video(b"x")).json()["queryId"]
+    qid2 = result(client, b"x")["queryId"]
     taken = client.post("/api/gallery", json={"name": "ahmad", "queryId": qid2})
     assert taken.status_code == 409 and taken.json()["error"] == "name_taken"
     bad = client.post("/api/gallery", json={"name": "../x", "queryId": qid2})
@@ -78,26 +95,35 @@ def test_from_video_rejects_taken_name_before_processing(client):
     assert res.status_code == 409
 
 
-def test_upload_errors(client):
+def test_upload_errors_fail_before_a_job_starts(client):
     wrong = client.post("/api/identify", files=video(name="notes.txt"))
     assert wrong.status_code == 415 and wrong.json()["error"] == "unsupported_type"
 
     big = client.post("/api/identify", files=video(b"0" * (1024 * 1024 + 1)))
     assert big.status_code == 413 and big.json()["error"] == "file_too_large"
 
-    nobody = client.post("/api/identify", files=video(b"empty"))
-    assert nobody.status_code == 422 and nobody.json()["error"] == "no_person"
-
-    short = client.post("/api/identify", files=video(b"short"))
-    assert short.status_code == 422 and short.json()["error"] == "too_few_frames"
-
     missing = client.post("/api/identify")
     assert missing.status_code == 422 and missing.json()["error"] == "invalid_request"
 
 
-def test_uploads_are_not_kept(client, settings):
+def test_video_problems_end_the_job_with_an_error(client):
+    nobody = identify(client, b"empty")
+    assert nobody["status"] == "error" and nobody["error"]["error"] == "no_person"
+    assert "result" not in nobody
+
+    short = identify(client, b"short")
+    assert short["status"] == "error" and short["error"]["error"] == "too_few_frames"
+
+
+def test_uploads_are_not_kept(client, settings, tmp_path, monkeypatch):
+    import tempfile
+
+    monkeypatch.setattr(tempfile, "tempdir", str(tmp_path / "tmp"))
+    (tmp_path / "tmp").mkdir()
     client.post("/api/gallery/from-video", data={"name": "A"}, files=video())
-    client.post("/api/identify", files=video())
+    result(client)
+    identify(client, b"empty")  # a failed job cleans up too
+    assert list((tmp_path / "tmp").iterdir()) == []
     stored = {p.suffix for p in settings.storage_dir.rglob("*") if p.is_file()}
     assert stored <= {".json", ".npy", ".png"}
 
@@ -132,5 +158,5 @@ def test_rename_and_delete_case_files(client):
     assert names == ["Kareem Hamza"]
 
     # The renamed walker is still recognised under the new name.
-    again = client.post("/api/identify", files=video(b"k")).json()
+    again = result(client, b"k")
     assert again["isMatch"] and again["suspects"][0]["personId"] == "Kareem Hamza"

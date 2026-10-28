@@ -1,4 +1,4 @@
-"""Uploaded videos go to a temp file for the length of one request, then are deleted."""
+"""Uploaded videos go to a temp file only while they are processed, then are deleted."""
 
 import os
 import tempfile
@@ -14,8 +14,8 @@ VIDEO_EXTENSIONS = (".mp4", ".mov", ".avi", ".mkv", ".webm")
 CHUNK = 1024 * 1024
 
 
-@contextmanager
-def saved_upload(video: UploadFile, max_mb: int) -> Iterator[Path]:
+def save_upload(video: UploadFile, max_mb: int) -> Path:
+    """Writes the upload to a temp file and returns its path. The caller must delete it."""
     name = video.filename or ""
     suffix = Path(name).suffix.lower()
     if suffix not in VIDEO_EXTENSIONS:
@@ -39,6 +39,17 @@ def saved_upload(video: UploadFile, max_mb: int) -> Iterator[Path]:
                 out.write(chunk)
         if written == 0:
             raise ApiError("unreadable_video", "The uploaded file is empty.", 422)
-        yield tmp
-    finally:
+    except BaseException:
         tmp.unlink(missing_ok=True)
+        raise
+    return tmp
+
+
+@contextmanager
+def saved_upload(video: UploadFile, max_mb: int) -> Iterator[Path]:
+    """For work done inside the request: the temp file is deleted when the block ends."""
+    path = save_upload(video, max_mb)
+    try:
+        yield path
+    finally:
+        path.unlink(missing_ok=True)

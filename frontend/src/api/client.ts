@@ -27,6 +27,17 @@ export interface VerdictResult {
   querySilhouettes: string[] // PNG data URLs
 }
 
+// Identify runs as a job on the server; the Verdict page polls its status (HANDOFF §7.3).
+export type JobStage = 'queued' | 'detecting' | 'silhouettes' | 'embedding' | 'searching' | 'done' | 'error'
+
+export interface JobStatus {
+  jobId: string
+  status: JobStage
+  progress: number // 0..1 over the whole investigation
+  result?: VerdictResult
+  error?: { error: string; message: string }
+}
+
 export interface CaseFile {
   personId: string
   videoPath: string
@@ -64,6 +75,8 @@ const FRIENDLY: Record<string, string> = {
   gallery_incompatible: 'The Archive was built with different settings and has to be rebuilt.',
   query_expired: 'This investigation has gone cold. Investigate the clip again to save it.',
   name_taken: 'A case file with this name already exists.',
+  job_not_found: 'This investigation was lost (the server may have restarted). Investigate the clip again.',
+  server_error: 'Something went wrong on the server while investigating this clip.',
   network: "Can't reach the Swalker server. Is the backend running?",
 }
 
@@ -103,7 +116,9 @@ export const api = {
   health: () => request<Health>('/api/health'),
   gallery: () => request<{ entries: CaseFile[]; compatible: boolean }>('/api/gallery'),
   caseFile: (personId: string) => request<CaseFileDetail>(`/api/gallery/${encodeURIComponent(personId)}`),
-  identify: (video: File) => request<VerdictResult>('/api/identify', { method: 'POST', body: videoForm(video) }),
+  startIdentify: (video: File) =>
+    request<{ jobId: string; status: JobStage }>('/api/identify', { method: 'POST', body: videoForm(video) }),
+  identifyStatus: (jobId: string) => request<JobStatus>(`/api/identify/${encodeURIComponent(jobId)}/status`),
   saveQuery: (name: string, queryId: string) =>
     request<CaseFileDetail>('/api/gallery', {
       method: 'POST',
