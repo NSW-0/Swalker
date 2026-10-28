@@ -3,7 +3,7 @@
 Made to run on Kaggle, where CASIA-B and the GPU are. It needs only torch, numpy and OpenCV
 (no FastAPI, no ultralytics). In a Kaggle notebook:
 
-    !git clone -b nSawafta/backend https://github.com/NSW-0/Swalker.git
+    !git clone https://github.com/NSW-0/Swalker.git    (main, after the eval-progress PR is merged)
     %cd Swalker/backend
     !python -m scripts.casia_eval \\
         --root /kaggle/input/<casia-b dataset>/<folder with 001..124> \\
