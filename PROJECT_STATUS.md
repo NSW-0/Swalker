@@ -11,11 +11,15 @@ the background behind each item, see `HANDOFF.md`. For running the backend, see 
   Only `feat` is used. YOLOv8n-seg also loads once. If loading fails, the API still starts and
   `/api/health` says why.
 - **Video to silhouettes**, rebuilt from the old `silhouette_extractor.py`:
-  - CASIA-B style framing by default, ported from the training code's
-    `CCPG_MATCH_CASIA_GEOMETRY`: crop to the person, height 50.1% of the frame, width squashed
-    by 0.52, bbox top at 23.3%, greyscale kept (HANDOFF §6.1). The spec doesn't fix the
-    horizontal position, so the person is centred. The old tight crop is still available as
-    `SWALKER_PREPROCESS_MODE=crop`. The Archive records the framing version.
+  - CASIA-B style framing by default (`casia_clip`), using the training code's
+    `CCPG_MATCH_CASIA_GEOMETRY` numbers: height 50.1% of the frame, width squashed by 0.52, bbox
+    top at 23.3%, centre at 51.4%, greyscale kept (HANDOFF §6.1). One scale and position is used
+    for the whole clip, so each frame keeps the size changes, bobbing and movement across the
+    frame that the camera saw. Per-frame framing (`casia`) and the old tight crop (`crop`) are
+    still selectable. The Archive records the framing and its version.
+  - Measured on CASIA-B (2026-10-28, `casia_eval`, pooled Rank-1 NM / BG / CL, CASIA-B's own
+    masks): training-side framing 99.27 / 93.26 / 72.36, `casia_clip` 97.82 / 90.06 / 56.64,
+    `casia` 96.09 / 78.05 / 35.73, `crop` 69.45 / 41.17 / 12.09.
   - Frames are fed in order and consecutive, up to 120. No more spreading 30 frames across the
     clip (§6.2).
   - **Walker tracking:** the same person is followed across frames by box overlap. Before, each
@@ -49,8 +53,8 @@ the background behind each item, see `HANDOFF.md`. For running the backend, see 
   - `casia_eval`, for Kaggle: first checks that `train` mode reproduces the known baseline
     (NM 99.27 / BG 93.26 / CL 72.36) and marks the threshold untrusted if not; then Rank-1 for each
     preprocessing mode in three protocols (with counts like 796/1100), genuine/impostor distances
-    and a threshold table. Detects flat, nested and wrapped dataset layouts. Checked locally on a
-    tiny fake dataset only; **not yet run on real CASIA-B**
+    and a threshold table. Detects flat, nested and wrapped dataset layouts. Run on real CASIA-B on
+    Kaggle on 2026-10-28: baseline reproduced exactly
   - `embed_video` (determinism check)
   - `calibrate_threshold` (genuine vs impostor distances)
   - `import_gallery_pkl` (import an old `gallery.pkl`)

@@ -15,6 +15,7 @@ from app.ml.silhouettes import (
     central_window,
     check_enough,
     crop_silhouette,
+    crop_to_person,
     pick_display,
 )
 from tests.conftest import person_mask
@@ -132,11 +133,15 @@ def _cols(sil, level=0.05):
     return np.flatnonzero(sil.max(axis=0) > level)
 
 
+def _crops(masks):
+    return [crop_to_person(m) for m in masks]
+
+
 def test_casia_sequence_keeps_per_frame_size_changes():
     # Heights 180 / 200 / 220 px: the median (200) becomes 50.1% of the frame, the others stay
     # 10% smaller / larger instead of all being stretched to the same height.
     masks = [person_mask(h=480, w=640, top=100, height=hgt, width=50, left=300) for hgt in (180, 200, 220)]
-    sils = casia_sequence(masks)
+    sils = casia_sequence(_crops(masks))
     heights = [len(_rows(s)) for s in sils]
     assert heights[1] / 64 == pytest.approx(CASIA_PERSON_HEIGHT, abs=2 / 64)
     assert heights[0] < heights[1] < heights[2]
@@ -145,14 +150,22 @@ def test_casia_sequence_keeps_per_frame_size_changes():
 
 def test_casia_sequence_follow_x_keeps_movement_across_the_frame():
     masks = [person_mask(h=480, w=640, top=100, height=200, width=50, left=x) for x in (250, 300, 350)]
-    centred = [_cols(s).mean() for s in casia_sequence(masks)]
-    moving = [_cols(s).mean() for s in casia_sequence(masks, follow_x=True)]
+    centred = [_cols(s).mean() for s in casia_sequence(_crops(masks))]
+    moving = [_cols(s).mean() for s in casia_sequence(_crops(masks), follow_x=True)]
     assert max(centred) - min(centred) < 1
     assert moving[0] < moving[1] < moving[2] and moving[2] - moving[0] > 4
 
 
 def test_casia_sequence_handles_empty_frames():
     empty = np.zeros((480, 640), np.uint8)
-    assert casia_sequence([empty, empty]) == [None, None]
-    sils = casia_sequence([empty, person_mask(h=480, w=640, top=100, height=200, width=50, left=300)])
+    assert casia_sequence(_crops([empty, empty])) == [None, None]
+    sils = casia_sequence(_crops([empty, person_mask(h=480, w=640, top=100, height=200, width=50, left=300)]))
     assert sils[0] is None and sils[1].shape == (64, 44)
+
+
+def test_casia_sequence_follow_x_uses_where_each_crop_was_in_the_frame():
+    # The walker crosses the frame: the crops all look alike, only their position differs.
+    masks = [person_mask(h=480, w=640, top=100, height=200, width=50, left=x) for x in (100, 300, 500)]
+    centres = [_cols(s).mean() for s in casia_sequence(_crops(masks), follow_x=True)]
+    assert centres[0] < centres[1] < centres[2]
+    assert centres[1] == pytest.approx(44 * 0.514 - 0.5, abs=1)  # the median position -> 51.4%

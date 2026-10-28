@@ -22,7 +22,7 @@ class Settings(BaseSettings):
 
     # How each frame's mask becomes a 64x44 silhouette. See ml/silhouettes.py.
     # Gallery and query must use the same mode; the gallery records which one it was built with.
-    preprocess_mode: Literal["casia", "crop"] = "casia"
+    preprocess_mode: Literal["casia_clip", "casia", "crop"] = "casia_clip"
 
     # Clips are resampled to this frame rate first (CASIA-B is 25 fps), so a 60 fps phone clip
     # doesn't look like slow motion to the model.

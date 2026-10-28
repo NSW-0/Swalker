@@ -32,11 +32,16 @@ def test_progress_is_reported_in_stage_order(settings, tmp_path):
 
 
 def test_crop_to_person_gives_the_same_silhouette_as_the_full_frame():
-    from app.ml.silhouettes import casia_silhouette, crop_silhouette, crop_to_person
+    from app.ml.silhouettes import PersonCrop, casia_sequence, casia_silhouette, crop_silhouette, crop_to_person
     from tests.conftest import person_mask
 
-    full = person_mask(h=480, w=640, top=100, height=250, width=60, left=300)
-    crop = crop_to_person(full)
-    assert crop.shape[0] < full.shape[0] and crop.shape[1] < full.shape[1]
-    np.testing.assert_array_equal(casia_silhouette(crop), casia_silhouette(full))
-    np.testing.assert_array_equal(crop_silhouette(crop), crop_silhouette(full))
+    full = [person_mask(h=480, w=640, top=100 + 5 * i, height=250, width=60, left=150 + 40 * i) for i in range(3)]
+    crops = [crop_to_person(m) for m in full]
+    assert crops[0].mask.shape[0] < 480 and crops[0].mask.shape[1] < 640
+    np.testing.assert_array_equal(casia_silhouette(crops[0].mask), casia_silhouette(full[0]))
+    np.testing.assert_array_equal(crop_silhouette(crops[0].mask), crop_silhouette(full[0]))
+    # The clip-level framing needs where each crop was: same result as from the whole frames.
+    whole = [PersonCrop(m, 0, 0) for m in full]
+    for follow_x in (False, True):
+        for a, b in zip(casia_sequence(crops, follow_x), casia_sequence(whole, follow_x), strict=True):
+            np.testing.assert_array_equal(a, b)

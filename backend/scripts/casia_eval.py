@@ -39,13 +39,13 @@ What it reports, for the 50 LT test subjects (075-124 by default):
      train  - exactly casia_b_loader.load_silhouette(): PIL convert('L'), whole frame resized to
               44x64 with PIL BILINEAR (which, unlike OpenCV INTER_LINEAR, averages when shrinking),
               /255, every frame kept including blank ones
-     casia  - the website's default: each frame's mask re-framed the CASIA-B way
-              (app/ml/silhouettes.py casia_silhouette)
+     casia  - each frame's mask re-framed the CASIA-B way (app/ml/silhouettes.py casia_silhouette)
      casia_seq   - the same framing with one scale and vertical offset per clip, so per-frame
                    size and height changes survive (casia_sequence), each frame centred
-     casia_seq_x - casia_seq that also keeps the walker's movement across the frame
+     casia_seq_x - casia_seq that also keeps the walker's movement across the frame; the
+                   website's default (preprocess mode casia_clip)
      crop   - the old silhouette_extractor.py tight crop (off by default, see DEFAULT_MODES)
-   If casia is close to train, the website's framing is fine. If it's clearly lower, fix it.
+   The closer casia_seq_x is to train, the less the website's framing costs.
    The CASIA-B mask stands in for the YOLO mask here; YOLO's own errors are not measured.
 
 2. Genuine vs impostor distances (NM probes vs NM gallery, same view, like the website where both
@@ -65,7 +65,7 @@ from pathlib import Path
 import numpy as np
 from PIL import Image
 
-from app.ml.silhouettes import casia_sequence, casia_silhouette, crop_silhouette
+from app.ml.silhouettes import casia_sequence, casia_silhouette, crop_silhouette, crop_to_person
 
 VIEWS = [f"{v:03d}" for v in range(0, 181, 18)]
 GALLERY = ("nm", (1, 2, 3, 4))
@@ -92,8 +92,10 @@ def per_frame(fn):
 MODES = {
     "train": per_frame(train_style),
     "casia": per_frame(lambda f: casia_silhouette(as_mask(f))),
-    "casia_seq": lambda frames: casia_sequence([as_mask(f) for f in frames]),
-    "casia_seq_x": lambda frames: casia_sequence([as_mask(f) for f in frames], follow_x=True),
+    "casia_seq": lambda frames: casia_sequence([crop_to_person(as_mask(f)) for f in frames]),
+    # The website's default, preprocess mode casia_clip (named before it was chosen; kept so
+    # progress files from that run still resume).
+    "casia_seq_x": lambda frames: casia_sequence([crop_to_person(as_mask(f)) for f in frames], follow_x=True),
     "crop": per_frame(lambda f: crop_silhouette(as_mask(f))),
 }
 # crop was measured on 2026-10-28 (pooled NM 69.45 / BG 41.17 / CL 12.09) and is off by default.
@@ -320,7 +322,12 @@ def main() -> None:
     parser.add_argument("--root", type=Path, required=True)
     parser.add_argument("--checkpoint", type=Path, required=True)
     parser.add_argument("--modes", nargs="+", default=DEFAULT_MODES, choices=list(MODES))
-    parser.add_argument("--calibrate-mode", default="casia", choices=list(MODES), help="mode used for the threshold")
+    parser.add_argument(
+        "--calibrate-mode",
+        default="casia_seq_x",
+        choices=list(MODES),
+        help="mode used for the threshold (casia_seq_x = the website's casia_clip)",
+    )
     parser.add_argument("--subjects", default="75-124", help="test subject range, e.g. 75-124")
     parser.add_argument("--max-frames", type=int, default=0, help="cap frames per sequence (0 = whole sequence)")
     parser.add_argument("--limit", type=int, default=0, help="only the first N sequences (quick smoke test)")
@@ -437,7 +444,7 @@ def main() -> None:
         want = ", ".join(f"{k} {v:.2f}" for k, v in expected.items())
         if hits:
             print(f"\nBASELINE OK: 'train' mode reproduces {want} under: {', '.join(hits)}")
-            print("  Compare 'casia' and 'crop' with 'train' in that same protocol.")
+            print("  Compare the other modes with 'train' in that same protocol.")
         else:
             print(f"\nBASELINE NOT REPRODUCED: 'train' mode doesn't give {want} in the pooled protocol.")
             print("  The harness doesn't match the training-side evaluation (preprocessing, protocol or")
