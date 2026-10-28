@@ -50,6 +50,7 @@ What it reports, for the 50 LT test subjects (075-124 by default):
 """
 
 import argparse
+import io
 import json
 import re
 import time
@@ -131,8 +132,11 @@ def find_sequences(root: Path, subjects: range) -> tuple[list[dict], str]:
 
 
 def decode(path: Path) -> np.ndarray:
-    """Like load_silhouette(): transparent pixels onto black, then PIL greyscale."""
-    img = Image.open(path)
+    """Like load_silhouette(): transparent pixels onto black, then PIL greyscale.
+
+    The file is read in one call and decoded from memory: PIL reading the file itself does several
+    small reads, each a round trip on /kaggle/input (likely why disk wait went from ~20 s to ~1000 s per 250)."""
+    img = Image.open(io.BytesIO(path.read_bytes()))
     if img.mode in ("RGBA", "LA") or (img.mode == "P" and "transparency" in img.info):
         img = Image.alpha_composite(Image.new("RGBA", img.size, (0, 0, 0, 255)), img.convert("RGBA"))
     return np.asarray(img.convert("L"), dtype=np.uint8)
