@@ -33,9 +33,9 @@ Names you'll see for the same model: **GLTNet** (paper / README), **Combined GLF
 | Model architecture | Final. Do not change. |
 | Trained weights | Done: `stage2_iter70000.pth` (on Kaggle, see §5) |
 | Research training runs | Still going on Kaggle, separate from the website (see §5.3) |
-| Python inference scripts | Exist (`silhouette_extractor.py`, `gallery_builder.py`, `identify.py`) but are CLI scripts, not a service, and have preprocessing problems (see §6) |
-| Frontend | Done, running on **mock data** |
-| Backend | **Not started.** This is the remaining work. |
+| Python inference scripts | Rewritten into `backend/app/ml/` (2026-10-28). §6.2, §6.3 (threshold mechanism), §6.5 and §6.6 fixed; §6.1 implemented as `casia` mode but **not measured** |
+| Frontend | Done, wired to the real API; mock data removed (2026-10-28) |
+| Backend | Steps 1–5 of §7.6 done (`backend/README.md`). Left: calibrate the threshold on real recordings, measure §6.1, progress reporting (§7.3) |
 
 ---
 
