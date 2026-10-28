@@ -19,6 +19,9 @@ the background behind each item, see `HANDOFF.md`. For running the backend, see 
   - **Walker tracking:** the same person is followed across frames by box overlap. Before, each
     frame took "the most confident person", so bystanders got mixed into the walk.
   - YOLO masks are taken at frame resolution (`retina_masks`), so they are no longer misaligned.
+  - **Frame rate:** clips are resampled to 25 fps (CASIA-B's rate) before segmenting, so a 60 fps
+    phone clip isn't fed as slow motion. The Archive records the frame rate, so Archives built
+    before this change are flagged incompatible.
   - Reading stops after 450 frames, so long uploads can't take minutes.
 - **Matching:** Euclidean distance, top 3, and a match threshold, so strangers come out as
   "Unknown" (§6.3). Raw distances are always returned. "Strength" is labelled as relative only (§6.4).
@@ -36,11 +39,15 @@ the background behind each item, see `HANDOFF.md`. For running the backend, see 
 
   Errors the UI can show: no person, too few frames, wrong type, too large, model not loaded,
   name taken, expired query.
+- **Archive editing:** `PATCH /api/gallery/{id}` renames (the vector and silhouettes stay),
+  `DELETE /api/gallery/{id}` removes the vector, the entry and its silhouettes.
 - **Scripts:**
+  - `casia_eval`, for Kaggle: Rank-1 for each preprocessing mode on the CASIA-B test set, plus
+    genuine/impostor distances and a threshold table (checked locally on a tiny fake dataset only)
   - `embed_video` (determinism check)
   - `calibrate_threshold` (genuine vs impostor distances)
   - `import_gallery_pkl` (import an old `gallery.pkl`)
-- **Quality:** ruff (lint + format) and 46 pytest tests. A new GitHub Actions job,
+- **Quality:** ruff (lint + format) and 56 pytest tests. A new GitHub Actions job,
   `.github/workflows/backend-ci.yml`, runs them on PRs.
 
 ### Frontend (`frontend/`): wired to the real API, mock data removed
@@ -63,6 +70,7 @@ the background behind each item, see `HANDOFF.md`. For running the backend, see 
   - fits 1440×900 and 1280×720 without scrolling and stacks on phones
 - **Archive:** loads from the server, with loading, empty and error states. Case file dialog shows
   silhouettes, the vector preview, L2 norm and date. **"Add Case File" works** (name + video upload).
+  Case files can be **renamed** and **deleted** (delete asks to confirm inside the dialog).
 - `vite.config.ts` proxies `/api` to `localhost:8000`.
 
 ### Checked so far
@@ -77,12 +85,14 @@ the background behind each item, see `HANDOFF.md`. For running the backend, see 
 
 1. **Record real walking clips** of the team and others: side view, whole body in frame, 3–5 s,
    2–3 clips per person (HANDOFF §7.5).
-2. **Calibrate the match threshold.** Run `python -m scripts.calibrate_threshold videos\` on those
-   clips, set `SWALKER_MATCH_THRESHOLD` in `backend/.env`, and set
+2. **Calibrate the match threshold.** A first value can come from `scripts/casia_eval.py` on
+   Kaggle now, without recordings. Then run `python -m scripts.calibrate_threshold videos\` on the
+   team's clips to check it, set `SWALKER_MATCH_THRESHOLD` in `backend/.env`, and set
    `SWALKER_THRESHOLD_CALIBRATED=true`. Until then the 30 is a placeholder, and the Verdict page
    says the match line is provisional.
-3. **Measure the preprocessing (§6.1).** On CASIA-B test sequences (Kaggle), compare Rank-1 for
-   `casia` vs `crop` mode and keep the better one. Also replace the framing numbers in
+3. **Measure the preprocessing (§6.1).** Run `scripts/casia_eval.py` on Kaggle (instructions in the
+   script) and compare Rank-1 for `train` vs `casia` vs `crop`. If `casia` is clearly below
+   `train`, the website's framing needs fixing. Also replace the framing numbers in
    `backend/app/ml/silhouettes.py` with `CCPG_MATCH_CASIA_GEOMETRY` from the newest
    `casia_b_loader.py`. Changing the mode means rebuilding the Archive.
 4. **Build the real Archive** from the recorded clips (Archive → "Add Case File").
@@ -96,8 +106,6 @@ the background behind each item, see `HANDOFF.md`. For running the backend, see 
   a mobile pass on the shell.
 - Several clips of one person aren't averaged yet: each case file holds one clip's vector.
   Averaging may help (HANDOFF §7.5).
-- Archive entries can't be deleted or renamed from the UI yet. Do it by editing
-  `storage/gallery/` with the server stopped, or start a fresh folder.
 - The Archive is a single process's files. Run one backend instance, not several.
 - `backend/app/ml/combined_glfe_mstfe.py` must not be edited. A new architecture comes with its
   own checkpoint: replace both together.
