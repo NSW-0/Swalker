@@ -54,8 +54,8 @@ export default function About() {
             Swalker runs on a custom model, <strong>Combined GLFE + MSTFE</strong>, that fuses
             rich spatial detail of body parts with a multi-scale view of slow and fast walking
             dynamics over time. Trained on the CASIA-B benchmark at roughly 6.5M parameters, it
-            reaches <strong>99.18%</strong> accuracy on normal walking — state-of-the-art among
-            silhouette-based methods — and <strong>92.44%</strong> when the subject is carrying
+            reaches <strong>99.27%</strong> accuracy on normal walking — state-of-the-art among
+            silhouette-based methods — and <strong>93.26%</strong> when the subject is carrying
             a bag. Recognizing someone after a clothing change is still the hardest case
             (<strong>72.36%</strong>), largely because so few examples of that exist to learn
             from.
