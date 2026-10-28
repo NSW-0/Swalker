@@ -24,8 +24,11 @@ Weights (git-ignored, never commit them):
 ## Run
 
 ```
-uvicorn app.main:create_app --factory --port 8000
+python -m uvicorn app.main:create_app --factory --port 8000
 ```
+
+Use `python -m uvicorn`, not plain `uvicorn`: a `uvicorn` installed globally would run your global
+Python, which may not have the backend's packages (`No module named 'cv2'`).
 
 Then `cd frontend` and run `npm run dev`. Vite proxies `/api` to port 8000. Check
 http://localhost:8000/api/health: `modelLoaded` should be `true`.

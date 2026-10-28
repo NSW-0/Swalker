@@ -15,5 +15,5 @@ See [`frontend/README.md`](./frontend/README.md) for setup and run instructions.
 ## Backend
 
 See [`backend/README.md`](./backend/README.md). In short: put the weights in `backend/models/`,
-run `uvicorn app.main:create_app --factory --port 8000` from `backend/`, then `npm run dev` in
+run `python -m uvicorn app.main:create_app --factory --port 8000` from `backend/`, then `npm run dev` in
 `frontend/`.
