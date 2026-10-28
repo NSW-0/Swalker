@@ -87,8 +87,7 @@ Run them from `backend/` with the venv active.
   `calibrate_threshold` on the team's recordings, put it in `.env`, and set
   `SWALKER_THRESHOLD_CALIBRATED=true`. Until then the Verdict
   page says the match line is provisional.
-- **Preprocessing:** `casia` follows HANDOFF §6.1, but its Rank-1 against `crop` on CASIA-B has
-  **not been measured** yet (`casia_eval` does it). The framing numbers in `app/ml/silhouettes.py` come from HANDOFF; replace
-  them with `CCPG_MATCH_CASIA_GEOMETRY` from the Kaggle `casia_b_loader.py`.
-- **Progress:** identify is a single synchronous request. Job polling (HANDOFF §7.3) is still to do.
+- **Preprocessing:** `casia` is a port of the training code's `CCPG_MATCH_CASIA_GEOMETRY`
+  (`app/ml/silhouettes.py`), but its Rank-1 against `train`/`crop` on CASIA-B has **not been
+  measured** yet (`casia_eval` does it, after its baseline check).
 - `app/ml/combined_glfe_mstfe.py` is a frozen copy pinned to the checkpoint. Don't edit it here.

@@ -153,7 +153,8 @@ walking video
 | Originally published | 99.18% | 92.44% | 72.36% |
 | Re-measured with corrected evaluation (2026-09-22) | **99.27%** | **93.26%** | **72.36%** |
 
-The About page currently shows the original numbers. Both are honest; the corrected ones are newer.
+The About page shows the corrected numbers (since 2026-10-28). The originals were measured with the
+gallery encoded in a different BatchNorm mode than the probes; same checkpoint, CL unchanged (796/1100).
 CL (clothing change) is the known weak spot.
 
 ---
