@@ -1493,3 +1493,27 @@ h3 {
   font-size: 13px;
   color: #85838a;
 }
+
+/* Archive case file: rename / delete (inside the dialog portal, so not page-scoped) */
+.archive-actions {
+  width: 100%;
+}
+
+.archive-actions-row {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.archive-actions-rename {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.archive-actions-delete {
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(245, 143, 124, 0.45);
+  background: var(--accent-bg);
+}

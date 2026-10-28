@@ -11,6 +11,8 @@ import TextField from '@mui/material/TextField'
 import CloseIcon from '@mui/icons-material/Close'
 import AddOutlinedIcon from '@mui/icons-material/AddOutlined'
 import UploadFileOutlinedIcon from '@mui/icons-material/UploadFileOutlined'
+import EditOutlinedIcon from '@mui/icons-material/EditOutlined'
+import DeleteOutlinedIcon from '@mui/icons-material/DeleteOutlined'
 import { api, ApiError, checkVideo, formatSize } from '../api/client'
 import type { CaseFile, CaseFileDetail } from '../api/client'
 import { useUploadLimits } from '../api/useUploadLimits'
@@ -133,6 +135,111 @@ function AddCaseFileDialog({ open, onClose, onAdded }: { open: boolean; onClose:
         </DialogActions>
       </form>
     </Dialog>
+  )
+}
+
+// Rename / delete at the bottom of an open case file. Delete asks first, inside the dialog.
+function CaseFileActions({
+  personId,
+  onRenamed,
+  onDeleted,
+}: {
+  personId: string
+  onRenamed: (c: CaseFileDetail) => void
+  onDeleted: () => void
+}) {
+  const [mode, setMode] = useState<'idle' | 'rename' | 'delete'>('idle')
+  const [name, setName] = useState(personId)
+  const [error, setError] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+
+  const run = async (action: () => Promise<void>) => {
+    setBusy(true)
+    setError(null)
+    try {
+      await action()
+    } catch (e) {
+      setError(errorMessage(e))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const rename = () =>
+    run(async () => {
+      const trimmed = name.trim()
+      if (trimmed === personId) return setMode('idle')
+      onRenamed(await api.renameCaseFile(personId, trimmed))
+    })
+
+  const remove = () =>
+    run(async () => {
+      await api.deleteCaseFile(personId)
+      onDeleted()
+    })
+
+  if (mode === 'rename') {
+    return (
+      <form
+        className="archive-actions archive-actions-rename"
+        onSubmit={(e) => {
+          e.preventDefault()
+          void rename()
+        }}
+      >
+        <TextField
+          autoFocus
+          size="small"
+          label="New name"
+          value={name}
+          onChange={(e) => {
+            setName(e.target.value)
+            setError(null)
+          }}
+          error={error !== null}
+          helperText={error ?? ' '}
+          slotProps={{ htmlInput: { maxLength: 40 } }}
+          sx={{ flex: 1 }}
+        />
+        <Button onClick={() => setMode('idle')} disabled={busy} sx={{ color: 'var(--muted)' }}>
+          Cancel
+        </Button>
+        <Button type="submit" variant="contained" disabled={busy || name.trim() === ''} sx={{ borderRadius: '999px' }}>
+          {busy ? 'Saving…' : 'Save'}
+        </Button>
+      </form>
+    )
+  }
+
+  if (mode === 'delete') {
+    return (
+      <div className="archive-actions archive-actions-delete" role="alertdialog" aria-label="Confirm delete">
+        <p className="archive-dialog-text">
+          Delete <b>{personId}</b>? Their gait signature and silhouettes are removed for good, and Swalker won't
+          recognise them any more.
+        </p>
+        {error && <p className="archive-dialog-text archive-dialog-error">{error}</p>}
+        <div className="archive-actions-row">
+          <Button onClick={() => setMode('idle')} disabled={busy} sx={{ color: 'var(--muted)' }}>
+            Keep it
+          </Button>
+          <Button variant="contained" color="error" onClick={() => void remove()} disabled={busy} sx={{ borderRadius: '999px' }}>
+            {busy ? 'Deleting…' : 'Delete for good'}
+          </Button>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="archive-actions archive-actions-row">
+      <Button startIcon={<EditOutlinedIcon />} onClick={() => setMode('rename')} sx={{ color: 'var(--muted)' }}>
+        Rename
+      </Button>
+      <Button startIcon={<DeleteOutlinedIcon />} onClick={() => setMode('delete')} sx={{ color: 'var(--accent)' }}>
+        Delete
+      </Button>
+    </div>
   )
 }
 
@@ -261,6 +368,23 @@ export default function Archive() {
             </>
           )}
         </DialogContent>
+        {shown && (
+          <DialogActions sx={{ px: 3, pb: 2.5 }}>
+            <CaseFileActions
+              key={shown.personId}
+              personId={shown.personId}
+              onRenamed={(renamed) => {
+                setDetail(renamed)
+                setSearchParams({ person: renamed.personId }, { replace: true })
+                load()
+              }}
+              onDeleted={() => {
+                closeCase()
+                load()
+              }}
+            />
+          </DialogActions>
+        )}
       </Dialog>
 
       <AddCaseFileDialog

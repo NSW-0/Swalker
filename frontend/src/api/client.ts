@@ -112,6 +112,14 @@ export const api = {
     }),
   addFromVideo: (name: string, video: File) =>
     request<CaseFileDetail>('/api/gallery/from-video', { method: 'POST', body: videoForm(video, { name }) }),
+  renameCaseFile: (personId: string, name: string) =>
+    request<CaseFileDetail>(`/api/gallery/${encodeURIComponent(personId)}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name }),
+    }),
+  deleteCaseFile: (personId: string) =>
+    request<null>(`/api/gallery/${encodeURIComponent(personId)}`, { method: 'DELETE' }),
 }
 
 // Same limits the backend enforces; used to warn before uploading.
