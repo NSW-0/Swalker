@@ -6,16 +6,15 @@ Update this file at the end of each session.
 
 ## Current state
 
-- **Branch:** `nSawafta/eval-read-bytes`, pushed. The PR is **not opened yet**, on purpose: it
-  waited for the threshold, which is now set, so it can be opened.
-  Commits on it, not yet on `main`:
-  - `fbd982b` reads each CASIA-B PNG in one call (it was slow on Kaggle's network mount)
-  - `c56f3be` adds clip-level framing modes (`casia_seq`, `casia_seq_x`) to `casia_eval`
-  - `f7b1f11` makes the website frame silhouettes per clip (`casia_clip`, now the default)
-- **`main`** has `1bd0395` ("Match casia_eval's train mode to the training loader"). It was
-  committed and pushed straight to `main` by mistake instead of through a PR. The user was told
-  and asked whether to revert it and redo it as a PR. **No answer yet**, so ask again.
-- **Backend checks:** 70 pytest tests pass and ruff is clean. Run them from `backend/` with
+- **`main`** has everything up to PR #12 (clip-level framing `casia_clip`, threshold 8.2). An
+  earlier commit (`1bd0395`) went to `main` without a PR; it was decided to leave it.
+- **Branch `nSawafta/housekeeping`** (PR not merged yet as of 2026-10-29):
+  - CLAUDE.md now describes the real project and backend commands
+  - `start.bat` starts backend + frontend and opens the site (tested: models load on CUDA,
+    frontend answers); `.gitattributes` keeps `.bat` files CRLF, which cmd needs
+  - `casia_eval` gets three diagnostic modes for the CL gap (see next steps, item 1)
+  - old merged local branches were deleted; their copies on GitHub still exist
+- **Backend checks:** 72 pytest tests pass and ruff is clean. Run them from `backend/` with
   `.venv\Scripts\python -m pytest` and `.venv\Scripts\python -m ruff check .`. The system Python
   has no ruff.
 - **Local Archive** (`backend/storage/gallery/`) is empty, so changing the framing broke nothing.
@@ -40,7 +39,18 @@ YOLO's mask quality on real video is **not** measured by them.
 
 ## Next steps, in order
 
-1. ~~Threshold run on Kaggle~~ done 2026-10-29. Same Rank-1 as before, `BASELINE OK`. Threshold
+1. **Kaggle run: where does the CL gap come from?** (`casia_clip` 56.64 vs `train` 72.36,
+   pooled.) Default modes are now `train`, `casia_seq_x` (control), `native`, `native_scale`,
+   `native_pos` (`native_geometry` in `casia_eval.py`, ~50 min). Clone the branch
+   `nSawafta/housekeeping` (or `main` once merged) and run the usual command. Read it as:
+   - `native` vs `train`: cost of how the website draws the silhouette (binary mask,
+     area-averaged vs PIL bilinear). Fixable on the website if it's big.
+   - `native_scale` vs `native`: cost of moving each clip to a fixed position.
+   - `native_pos` vs `casia_seq_x`: cost of scaling each clip to a fixed height.
+   Scale and position can't be kept for real video (they depend on the camera), so if the gap
+   is there it's the price of not having CASIA-B's fixed camera. The noise-cleaning idea was
+   dropped: one affine per clip plus medians make stray pixels nearly harmless.
+2. ~~Threshold run on Kaggle~~ done 2026-10-29. Same Rank-1 as before, `BASELINE OK`. Threshold
    table for `casia_seq_x` (= `casia_clip`), NM vs NM same view:
 
    | views | 0.1% false match | 1% | 5% | 10% |
@@ -49,17 +59,11 @@ YOLO's mask quality on real video is **not** measured by them.
    | 090 (side) | 7.31 (93.00%) | 8.23 (95.75%) | 9.42 (99.00%) | 10.05 (99.00%) |
 
    Genuine median 6.50, impostor median 13.21 (all views).
-2. ~~Set the threshold~~ done: `match_threshold = 8.2` in `backend/app/config.py` (1% at the
+3. ~~Set the threshold~~ done: `match_threshold = 8.2` in `backend/app/config.py` (1% at the
    side view, the view the recording guide asks for). `threshold_calibrated` stays False until
    it's checked on real recordings with `scripts/calibrate_threshold`.
-3. **Open the PR** for `nSawafta/eval-read-bytes` into `main` (the user opens or merges it).
-4. **Optional: close more of the CL gap** (56.64 vs 72.36). Ideas not tested yet:
-   - Clean CASIA masks to the largest connected component before measuring the box, since
-     background noise can throw off the size.
-   - Scaling every clip to the same body height removes size differences between people. That
-     can't be fixed for real video, where camera distance varies, so maybe accept the gap.
-   - Each idea costs a full Kaggle run of about 2 hours. Add it as a new mode in `MODES`; keep
-     the existing mode names, so the cache still resumes.
+4. **Not started:** averaging several clips per person (HANDOFF §7.5), and the phone-width
+   layout (every page is 454 px wide on a 390 px phone; the shared shell, not one page).
 5. **Real recordings** (needs the team): record clips, run `scripts/calibrate_threshold`, build
    the Archive (`PROJECT_STATUS.md` → "Left to do").
 
@@ -83,6 +87,8 @@ YOLO's mask quality on real video is **not** measured by them.
 - **The Archive records preprocess mode + version + checkpoint + fps.** Changing any of them
   flags existing Archives incompatible (rebuild needed). Bump `PREPROCESS_VERSIONS` in
   `silhouettes.py` when a framing's output changes.
+- **A full `casia_eval` run** takes ~10 min of compute per mode plus reading (seconds when
+  Kaggle's disk is warm, over an hour when cold).
 - **The user works in cmd on Windows.** Give cmd-compatible git commands, stage files by name,
   and never commit `backups/`, `*.pth` / `*.pt` or storage. `frontend/src/assets/duckNoGem.png`
   and `wing.png` are the user's untracked files; leave them alone unless asked.

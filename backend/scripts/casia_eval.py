@@ -44,7 +44,10 @@ What it reports, for the 50 LT test subjects (075-124 by default):
                    size and height changes survive (casia_sequence), each frame centred
      casia_seq_x - casia_seq that also keeps the walker's movement across the frame; the
                    website's default (preprocess mode casia_clip)
-     crop   - the old silhouette_extractor.py tight crop (off by default, see DEFAULT_MODES)
+     crop   - the old silhouette_extractor.py tight crop
+     native, native_scale, native_pos - casia_seq_x with its per-clip scale and/or position
+              normalisation undone (native_geometry), to see which part costs the accuracy
+   Modes already measured are off by default, see DEFAULT_MODES.
    The closer casia_seq_x is to train, the less the website's framing costs.
    The CASIA-B mask stands in for the YOLO mask here; YOLO's own errors are not measured.
 
@@ -62,10 +65,22 @@ from collections import deque
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
+import cv2
 import numpy as np
 from PIL import Image
 
-from app.ml.silhouettes import casia_sequence, casia_silhouette, crop_silhouette, crop_to_person
+from app.ml.embed import IMG_H, IMG_W
+from app.ml.silhouettes import (
+    CASIA_BBOX_TOP,
+    CASIA_CENTRE_X,
+    CASIA_PERSON_HEIGHT,
+    CASIA_SQUASH,
+    SUPERSAMPLE,
+    casia_sequence,
+    casia_silhouette,
+    crop_silhouette,
+    crop_to_person,
+)
 
 VIEWS = [f"{v:03d}" for v in range(0, 181, 18)]
 GALLERY = ("nm", (1, 2, 3, 4))
@@ -88,6 +103,50 @@ def per_frame(fn):
     return lambda frames: [fn(f) for f in frames]
 
 
+def native_geometry(keep_scale: bool, keep_position: bool):
+    """casia_seq_x with some of its per-clip normalisation undone, to find where its gap to 'train'
+    comes from. casia_seq_x maps every frame of a clip with one affine transform: the clip's
+    median person height -> 50.1% of the frame, median top -> 23.3%, median centre -> 51.4%.
+    keep_scale uses the CASIA frame's own scale instead (240 px high -> 64); keep_position puts
+    the clip's median top and centre where they really were in the frame. With both, only the
+    website's way of drawing the silhouette is left (binary mask, area-averaged) vs train's
+    PIL bilinear on the original PNG."""
+    canvas_h, canvas_w = IMG_H * SUPERSAMPLE, IMG_W * SUPERSAMPLE
+
+    def run(frames):
+        masks = [as_mask(f) for f in frames]
+        boxes = []
+        for m in masks:
+            rows, cols = np.flatnonzero(m.any(axis=1)), np.flatnonzero(m.any(axis=0))
+            boxes.append((rows[0], rows[-1] + 1, cols[0], cols[-1] + 1) if rows.size else None)
+        found = np.array([b for b in boxes if b is not None], dtype=np.float64)
+        if found.size == 0:
+            return [None] * len(masks)
+        tops, bottoms, lefts, rights = found.T
+        top_ref, cx_ref = np.median(tops), np.median((lefts + rights) / 2)
+        frame_h, frame_w = masks[0].shape
+        if keep_scale:
+            sy, sx = canvas_h / frame_h, canvas_w / frame_w
+        else:
+            sy = canvas_h * CASIA_PERSON_HEIGHT / np.median(bottoms - tops)
+            sx = sy * CASIA_SQUASH
+        if keep_position:
+            ty, tx = canvas_h * top_ref / frame_h, canvas_w * cx_ref / frame_w
+        else:
+            ty, tx = canvas_h * CASIA_BBOX_TOP, canvas_w * CASIA_CENTRE_X
+        affine = np.float32([[sx, 0, tx - cx_ref * sx], [0, sy, ty - top_ref * sy]])
+        out = []
+        for m, box in zip(masks, boxes, strict=True):
+            if box is None:
+                out.append(None)
+                continue
+            big = cv2.warpAffine(m.astype(np.float32) / 255.0, affine, (canvas_w, canvas_h), flags=cv2.INTER_LINEAR)
+            out.append(np.clip(cv2.resize(big, (IMG_W, IMG_H), interpolation=cv2.INTER_AREA), 0.0, 1.0))
+        return out
+
+    return run
+
+
 # Each mode turns a sequence's frames into its silhouettes (None = frame dropped).
 MODES = {
     "train": per_frame(train_style),
@@ -97,9 +156,15 @@ MODES = {
     # progress files from that run still resume).
     "casia_seq_x": lambda frames: casia_sequence([crop_to_person(as_mask(f)) for f in frames], follow_x=True),
     "crop": per_frame(lambda f: crop_silhouette(as_mask(f))),
+    # Where casia_seq_x's gap to train comes from (native_geometry):
+    "native": native_geometry(keep_scale=True, keep_position=True),  # drawing only
+    "native_scale": native_geometry(keep_scale=True, keep_position=False),  # + position normalised
+    "native_pos": native_geometry(keep_scale=False, keep_position=True),  # + scale normalised
 }
-# crop was measured on 2026-10-28 (pooled NM 69.45 / BG 41.17 / CL 12.09) and is off by default.
-DEFAULT_MODES = ["train", "casia", "casia_seq", "casia_seq_x"]
+# Measured on 2026-10-28/29, pooled NM / BG / CL: crop 69.45 / 41.17 / 12.09, casia 96.09 /
+# 78.05 / 35.73, casia_seq 92.55 / 76.40 / 40.18 (casia_seq_x 97.82 / 90.06 / 56.64, kept as
+# the control and for the threshold table).
+DEFAULT_MODES = ["train", "casia_seq_x", "native", "native_scale", "native_pos"]
 
 
 def detect_layout(root: Path, probe_sid: int) -> tuple[Path, str]:
