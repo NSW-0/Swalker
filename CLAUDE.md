@@ -1,7 +1,8 @@
 # Swalker / GLTNet website
 
-Gait recognition website for a Birzeit University ECE graduation project. Frontend is done and
-runs on mock data; the backend is the remaining work.
+Gait recognition website for a Birzeit University ECE graduation project. React frontend
+(`frontend/`) and FastAPI + PyTorch backend (`backend/`), wired together; no mock data left. What
+remains is mostly real recordings of people and checking the threshold on them.
 
 **Read `HANDOFF.md` before starting any task.** It explains the model, the frontend, the API the
 frontend expects, and known problems in the inference scripts. Then read `SESSION_NOTES.md`:
@@ -14,7 +15,11 @@ Frontend (`frontend/`):
 - `npm install`, `npm run dev` (http://localhost:5173)
 - `npm run lint` and `npm run build`: both must pass; CI runs them on PRs to `main`
 
-Backend (`backend/`): not created yet. Planned: Python, FastAPI, uvicorn, ruff, pytest.
+Backend (`backend/`, see `backend/README.md`), with the venv in `backend/.venv`:
+- `.venv\Scripts\python -m uvicorn app.main:create_app --factory --port 8000`
+- `.venv\Scripts\python -m ruff check .`, `ruff format .` and `-m pytest`: all must pass; CI runs
+  them on PRs to `main`. The system Python has no ruff.
+- `scripts/casia_eval.py` runs on Kaggle (CASIA-B + GPU), not locally.
 
 ## Rules
 
