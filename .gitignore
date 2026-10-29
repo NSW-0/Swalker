@@ -24,6 +24,9 @@ mockups/
 .env.local
 *.local
 
+# start.bat makes this shortcut on each machine (it holds full paths)
+Swalker.lnk
+
 # Editor / OS
 .DS_Store
 .vscode/
