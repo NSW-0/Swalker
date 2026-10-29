@@ -47,6 +47,8 @@ What it reports, for the 50 LT test subjects (075-124 by default):
      crop   - the old silhouette_extractor.py tight crop
      native, native_scale, native_pos - casia_seq_x with its per-clip scale and/or position
               normalisation undone (native_geometry), to see which part costs the accuracy
+     native_bin - train's drawing of a binary mask (cost of binarising alone)
+     clip_pil - casia_seq_x's geometry drawn like train (silhouettes.casia_clip_frames)
    Modes already measured are off by default, see DEFAULT_MODES.
    The closer casia_seq_x is to train, the less the website's framing costs.
    The CASIA-B mask stands in for the YOLO mask here; YOLO's own errors are not measured.
@@ -76,6 +78,7 @@ from app.ml.silhouettes import (
     CASIA_PERSON_HEIGHT,
     CASIA_SQUASH,
     SUPERSAMPLE,
+    casia_clip_frames,
     casia_sequence,
     casia_silhouette,
     crop_silhouette,
@@ -160,11 +163,16 @@ MODES = {
     "native": native_geometry(keep_scale=True, keep_position=True),  # drawing only
     "native_scale": native_geometry(keep_scale=True, keep_position=False),  # + position normalised
     "native_pos": native_geometry(keep_scale=False, keep_position=True),  # + scale normalised
+    # Train's drawing from a binary mask: what turning the PNG into a 0/255 mask alone costs.
+    "native_bin": per_frame(lambda f: train_style(as_mask(f))),
+    # casia_seq_x's geometry drawn like train (binary 320x240 frame, PIL BILINEAR).
+    "clip_pil": lambda frames: casia_clip_frames([crop_to_person(as_mask(f)) for f in frames]),
 }
 # Measured on 2026-10-28/29, pooled NM / BG / CL: crop 69.45 / 41.17 / 12.09, casia 96.09 /
-# 78.05 / 35.73, casia_seq 92.55 / 76.40 / 40.18 (casia_seq_x 97.82 / 90.06 / 56.64, kept as
-# the control and for the threshold table).
-DEFAULT_MODES = ["train", "casia_seq_x", "native", "native_scale", "native_pos"]
+# 78.05 / 35.73, casia_seq 92.55 / 76.40 / 40.18, native 97.27 / 91.79 / 64.27, native_scale
+# 97.73 / 91.25 / 61.55, native_pos 98.00 / 89.97 / 63.73 (casia_seq_x 97.82 / 90.06 / 56.64,
+# kept as the control).
+DEFAULT_MODES = ["train", "casia_seq_x", "native_bin", "clip_pil"]
 
 
 def detect_layout(root: Path, probe_sid: int) -> tuple[Path, str]:
@@ -389,7 +397,7 @@ def main() -> None:
     parser.add_argument("--modes", nargs="+", default=DEFAULT_MODES, choices=list(MODES))
     parser.add_argument(
         "--calibrate-mode",
-        default="casia_seq_x",
+        default="clip_pil",
         choices=list(MODES),
         help="mode used for the threshold (casia_seq_x = the website's casia_clip)",
     )

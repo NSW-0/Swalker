@@ -5,4 +5,5 @@ python-multipart==0.0.32
 pydantic-settings==2.14.2
 numpy==2.1.2
 opencv-python==5.0.0.93
+pillow==11.0.0
 ultralytics==8.4.191

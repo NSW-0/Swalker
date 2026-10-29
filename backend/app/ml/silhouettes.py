@@ -18,6 +18,7 @@ from pathlib import Path
 
 import cv2
 import numpy as np
+from PIL import Image
 
 from app.errors import ApiError, NoPersonError, TooFewFramesError
 from app.ml.embed import IMG_H, IMG_W
@@ -292,6 +293,49 @@ def casia_sequence(crops: list[PersonCrop | None], follow_x: bool = False) -> li
             round(frame_h * CASIA_BBOX_TOP + (top - top_ref) * sy),
         )
         out.append(np.clip(cv2.resize(frame, (IMG_W, IMG_H), interpolation=cv2.INTER_AREA), 0.0, 1.0))
+    return out
+
+
+CASIA_FRAME_H, CASIA_FRAME_W = 240, 320  # CASIA-B's silhouette PNGs
+
+
+def casia_clip_frames(crops: list[PersonCrop | None], follow_x: bool = True) -> list[np.ndarray | None]:
+    """casia_sequence's geometry, drawn the way training saw CASIA-B.
+
+    Each frame is rebuilt as a binary 320x240 CASIA-B-style frame, then shrunk to 44x64 with PIL
+    BILINEAR, exactly as casia_b_loader.load_silhouette() does. PIL BILINEAR blurs more than
+    area averaging when shrinking, and on CASIA-B that drawing difference alone cost 8 points of
+    CL Rank-1 (casia_eval 'native' vs 'train', 2026-10-29). The person keeps their aspect ratio
+    in the 320x240 frame; the resize to 44x64 squashes them like CASIA-B (0.516, which is what
+    CASIA_SQUASH approximates).
+    """
+    boxes = [_frame_bbox(c) for c in crops]
+    found = np.array([b for b in boxes if b is not None], dtype=np.float64)
+    if found.size == 0:
+        return [None] * len(crops)
+    tops, bottoms, lefts, rights = found.T
+    scale = CASIA_FRAME_H * CASIA_PERSON_HEIGHT / np.median(bottoms - tops)
+    top_ref, cx_ref = np.median(tops), np.median((lefts + rights) / 2)
+
+    out: list[np.ndarray | None] = []
+    for crop, box in zip(crops, boxes, strict=True):
+        if box is None:
+            out.append(None)
+            continue
+        top, bottom, left, right = box
+        person = crop.mask[top - crop.top : bottom - crop.top, left - crop.left : right - crop.left]
+        size = (max(1, round((right - left) * scale)), max(1, round((bottom - top) * scale)))
+        person = cv2.resize(person.astype(np.float32) / 255.0, size, interpolation=cv2.INTER_AREA)
+        cx = cx_ref if follow_x else (left + right) / 2
+        frame = np.zeros((CASIA_FRAME_H, CASIA_FRAME_W), np.float32)
+        _paste(
+            frame,
+            person,
+            round(CASIA_FRAME_W * CASIA_CENTRE_X + (left - cx) * scale),
+            round(CASIA_FRAME_H * CASIA_BBOX_TOP + (top - top_ref) * scale),
+        )
+        png = Image.fromarray(((frame >= 0.5) * 255).astype(np.uint8))  # binary, like CASIA-B's PNGs
+        out.append(np.asarray(png.resize((IMG_W, IMG_H), Image.BILINEAR), dtype=np.float32) / 255.0)
     return out
 
 
