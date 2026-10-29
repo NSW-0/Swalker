@@ -42,15 +42,16 @@ What it reports, for the 50 LT test subjects (075-124 by default):
      casia  - each frame's mask re-framed the CASIA-B way (app/ml/silhouettes.py casia_silhouette)
      casia_seq   - the same framing with one scale and vertical offset per clip, so per-frame
                    size and height changes survive (casia_sequence), each frame centred
-     casia_seq_x - casia_seq that also keeps the walker's movement across the frame; the
-                   website's default (preprocess mode casia_clip)
+     casia_seq_x - casia_seq that also keeps the walker's movement across the frame (the
+                   website's casia_clip version 1)
      crop   - the old silhouette_extractor.py tight crop
      native, native_scale, native_pos - casia_seq_x with its per-clip scale and/or position
               normalisation undone (native_geometry), to see which part costs the accuracy
      native_bin - train's drawing of a binary mask (cost of binarising alone)
-     clip_pil - casia_seq_x's geometry drawn like train (silhouettes.casia_clip_frames)
+     clip_pil - casia_seq_x's geometry drawn like train (silhouettes.casia_clip_frames): the
+                website's default, casia_clip version 2
    Modes already measured are off by default, see DEFAULT_MODES.
-   The closer casia_seq_x is to train, the less the website's framing costs.
+   The closer clip_pil is to train, the less the website's framing costs.
    The CASIA-B mask stands in for the YOLO mask here; YOLO's own errors are not measured.
 
 2. Genuine vs impostor distances (NM probes vs NM gallery, same view, like the website where both
@@ -155,8 +156,7 @@ MODES = {
     "train": per_frame(train_style),
     "casia": per_frame(lambda f: casia_silhouette(as_mask(f))),
     "casia_seq": lambda frames: casia_sequence([crop_to_person(as_mask(f)) for f in frames]),
-    # The website's default, preprocess mode casia_clip (named before it was chosen; kept so
-    # progress files from that run still resume).
+    # The website's casia_clip version 1.
     "casia_seq_x": lambda frames: casia_sequence([crop_to_person(as_mask(f)) for f in frames], follow_x=True),
     "crop": per_frame(lambda f: crop_silhouette(as_mask(f))),
     # Where casia_seq_x's gap to train comes from (native_geometry):
@@ -165,7 +165,9 @@ MODES = {
     "native_pos": native_geometry(keep_scale=False, keep_position=True),  # + scale normalised
     # Train's drawing from a binary mask: what turning the PNG into a 0/255 mask alone costs.
     "native_bin": per_frame(lambda f: train_style(as_mask(f))),
-    # casia_seq_x's geometry drawn like train (binary 320x240 frame, PIL BILINEAR).
+    # casia_seq_x's geometry drawn like train (binary 320x240 frame, PIL BILINEAR): the website's
+    # casia_clip version 2, pooled 97.82 / 90.07 / 63.91 on 2026-10-29 (native_bin was identical
+    # to train: CASIA-B's PNGs are already binary).
     "clip_pil": lambda frames: casia_clip_frames([crop_to_person(as_mask(f)) for f in frames]),
 }
 # Measured on 2026-10-28/29, pooled NM / BG / CL: crop 69.45 / 41.17 / 12.09, casia 96.09 /
@@ -399,7 +401,7 @@ def main() -> None:
         "--calibrate-mode",
         default="clip_pil",
         choices=list(MODES),
-        help="mode used for the threshold (casia_seq_x = the website's casia_clip)",
+        help="mode used for the threshold (clip_pil = the website's casia_clip)",
     )
     parser.add_argument("--subjects", default="75-124", help="test subject range, e.g. 75-124")
     parser.add_argument("--max-frames", type=int, default=0, help="cap frames per sequence (0 = whole sequence)")

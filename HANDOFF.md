@@ -33,7 +33,7 @@ Names you'll see for the same model: **GLTNet** (paper / README), **Combined GLF
 | Model architecture | Final. Do not change. |
 | Trained weights | Done: `stage2_iter70000.pth` (on Kaggle, see §5) |
 | Research training runs | Still going on Kaggle, separate from the website (see §5.3) |
-| Python inference scripts | Rewritten into `backend/app/ml/` (2026-10-28). §6.2, §6.3 (threshold mechanism), §6.5 and §6.6 fixed; §6.1 implemented as `casia_clip` mode and measured on CASIA-B (pooled Rank-1 97.82 / 90.06 / 56.64 vs 99.27 / 93.26 / 72.36 for the training framing, see `backend/README.md`) |
+| Python inference scripts | Rewritten into `backend/app/ml/` (2026-10-28). §6.2, §6.3 (threshold mechanism), §6.5 and §6.6 fixed; §6.1 implemented as `casia_clip` mode and measured on CASIA-B (pooled Rank-1 97.82 / 90.07 / 63.91 vs 99.27 / 93.26 / 72.36 for the training framing, see `backend/README.md`) |
 | Frontend | Done, wired to the real API; mock data removed (2026-10-28) |
 | Backend | Steps 1–5 of §7.6 done (`backend/README.md`). Left: calibrate the threshold on real recordings, measure §6.1, progress reporting (§7.3) |
 
