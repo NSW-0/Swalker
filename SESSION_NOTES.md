@@ -6,51 +6,48 @@ Update this file at the end of each session.
 
 ## Current state
 
-- **`main`** has everything up to PR #12 (clip-level framing `casia_clip`, threshold 8.2). An
-  earlier commit (`1bd0395`) went to `main` without a PR; it was decided to leave it.
-- **Branch `nSawafta/housekeeping`** (PR not merged yet as of 2026-10-29):
-  - CLAUDE.md now describes the real project and backend commands
-  - `start.bat` starts backend + frontend and opens the site (tested: models load on CUDA,
-    frontend answers); `.gitattributes` keeps `.bat` files CRLF, which cmd needs
-  - `casia_eval` gets three diagnostic modes for the CL gap (see next steps, item 1)
-  - old merged local branches were deleted; their copies on GitHub still exist
-- **Backend checks:** 72 pytest tests pass and ruff is clean. Run them from `backend/` with
+- **`main`** has everything up to PR #13: clip-level framing `casia_clip` (website default),
+  threshold 8.2, `start.bat`, the `native*` diagnostic modes. `1bd0395` went to `main` without a
+  PR; it was decided to leave it.
+- **`nSawafta/housekeeping`** still has one unmerged commit, `ea4e6c3` (duck icon: `swalker.ico`
+  + `start.bat` makes a git-ignored `Swalker.lnk` shortcut). It needs a second PR.
+- **Branch `nSawafta/clip-drawing`** (this session's last work, waiting for a Kaggle run):
+  `silhouettes.casia_clip_frames` and the eval modes `native_bin` and `clip_pil`. **Not** the
+  website default yet: switch only if the run shows it helps.
+- **Backend checks:** 74 pytest tests pass and ruff is clean. Run them from `backend/` with
   `.venv\Scripts\python -m pytest` and `.venv\Scripts\python -m ruff check .`. The system Python
   has no ruff.
-- **Local Archive** (`backend/storage/gallery/`) is empty, so changing the framing broke nothing.
+- **Local Archive** (`backend/storage/gallery/`) is empty, so changing the framing breaks nothing.
 
-## What was done in this session (the framing question, HANDOFF §6.1)
+## Where the CL gap comes from (Kaggle run 2026-10-29)
 
-`backend/scripts/casia_eval.py` was run on Kaggle on CASIA-B test subjects 075–124. Its `train`
-mode reproduces the training numbers exactly (pooled protocol: NM 99.27 / BG 93.26 / CL 72.36,
-`BASELINE OK`), so the other rows can be trusted. Pooled Rank-1, NM / BG / CL:
+Pooled Rank-1 NM / BG / CL; the `native*` modes undo parts of `casia_seq_x`
+(`native_geometry` in `casia_eval.py`):
 
-| mode | NM | BG | CL | note |
+| mode | NM | BG | CL | differs from train by |
 |---|---|---|---|---|
-| train | 99.27 | 93.26 | 72.36 | the training loader; whole CASIA frame, cannot be used on real video |
-| casia_seq_x | 97.82 | 90.06 | 56.64 | **now the website's default, called `casia_clip`** |
-| casia | 96.09 | 78.05 | 35.73 | per-frame framing, the old website default |
-| casia_seq | 92.55 | 76.40 | 40.18 | one scale per clip, but each frame centred |
-| crop | 69.45 | 41.17 | 12.09 | old `silhouette_extractor.py` crop |
+| train | 99.27 | 93.26 | 72.36 | |
+| native | 97.27 | 91.79 | 64.27 | drawing only (binary mask, linear warp + area average) |
+| native_pos | 98.00 | 89.97 | 63.73 | drawing + per-clip scale |
+| native_scale | 97.73 | 91.25 | 61.55 | drawing + per-clip position |
+| casia_seq_x | 97.82 | 90.06 | 56.64 | drawing + scale + position (= website) |
 
-In "per-probe, all views" (closest to how the website is used), `casia_seq_x` scores
-99.36 / 96.81 / 66.91 and `train` 99.82 / 98.18 / 82.91. These numbers use CASIA-B's own masks;
-YOLO's mask quality on real video is **not** measured by them.
+So the **drawing costs ~8 CL points** and is fixable. Scale alone costs ~0.5, position ~2.7,
+both together ~7.6 (they interact); those can't be kept for real video.
 
 ## Next steps, in order
 
-1. **Kaggle run: where does the CL gap come from?** (`casia_clip` 56.64 vs `train` 72.36,
-   pooled.) Default modes are now `train`, `casia_seq_x` (control), `native`, `native_scale`,
-   `native_pos` (`native_geometry` in `casia_eval.py`, ~50 min). Clone the branch
-   `nSawafta/housekeeping` (or `main` once merged) and run the usual command. Read it as:
-   - `native` vs `train`: cost of how the website draws the silhouette (binary mask,
-     area-averaged vs PIL bilinear). Fixable on the website if it's big.
-   - `native_scale` vs `native`: cost of moving each clip to a fixed position.
-   - `native_pos` vs `casia_seq_x`: cost of scaling each clip to a fixed height.
-   Scale and position can't be kept for real video (they depend on the camera), so if the gap
-   is there it's the price of not having CASIA-B's fixed camera. The noise-cleaning idea was
-   dropped: one affine per clip plus medians make stray pixels nearly harmless.
-2. ~~Threshold run on Kaggle~~ done 2026-10-29. Same Rank-1 as before, `BASELINE OK`. Threshold
+1. **Kaggle run on `nSawafta/clip-drawing`** (`git clone -b nSawafta/clip-drawing ...`, usual
+   command; check the modes line says `['train', 'casia_seq_x', 'native_bin', 'clip_pil']`,
+   ~40 min). The threshold table now defaults to `clip_pil`.
+   - `native_bin` vs `train`: what binarising the mask alone costs (the website only has binary
+     YOLO masks, so this part can't be fixed).
+   - `clip_pil` vs `casia_seq_x`: what training's drawing (binary 320x240 frame, PIL BILINEAR)
+     gains with the website's geometry.
+   - If `clip_pil` wins: add it to `PREPROCESSORS` as the new default (e.g. `casia_clip` version 2
+     in `PREPROCESS_VERSIONS`, which flags old Archives), set the threshold from its table,
+     update README / PROJECT_STATUS / HANDOFF §2 numbers.
+2. ~~Threshold run on Kaggle (casia_seq_x)~~ done 2026-10-29. Same Rank-1 as before, `BASELINE OK`. Threshold
    table for `casia_seq_x` (= `casia_clip`), NM vs NM same view:
 
    | views | 0.1% false match | 1% | 5% | 10% |
@@ -59,7 +56,7 @@ YOLO's mask quality on real video is **not** measured by them.
    | 090 (side) | 7.31 (93.00%) | 8.23 (95.75%) | 9.42 (99.00%) | 10.05 (99.00%) |
 
    Genuine median 6.50, impostor median 13.21 (all views).
-3. ~~Set the threshold~~ done: `match_threshold = 8.2` in `backend/app/config.py` (1% at the
+3. ~~Set the threshold for casia_seq_x~~ done: `match_threshold = 8.2` in `backend/app/config.py` (1% at the
    side view, the view the recording guide asks for). `threshold_calibrated` stays False until
    it's checked on real recordings with `scripts/calibrate_threshold`.
 4. **Not started:** averaging several clips per person (HANDOFF §7.5), and the phone-width

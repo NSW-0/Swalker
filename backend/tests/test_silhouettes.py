@@ -169,3 +169,29 @@ def test_casia_sequence_follow_x_uses_where_each_crop_was_in_the_frame():
     centres = [_cols(s).mean() for s in casia_sequence(_crops(masks), follow_x=True)]
     assert centres[0] < centres[1] < centres[2]
     assert centres[1] == pytest.approx(44 * 0.514 - 0.5, abs=1)  # the median position -> 51.4%
+
+
+def test_casia_clip_frames_draws_like_the_training_loader():
+    from PIL import Image
+
+    from app.ml.silhouettes import casia_clip_frames
+
+    # A walker already framed like CASIA-B (height 50.1%, top 23.3%, centre 51.4% of 320x240):
+    # the result must be exactly load_silhouette()'s PIL BILINEAR shrink of that frame.
+    height, top, width = round(240 * 0.501), round(240 * 0.233), 40
+    mask = person_mask(h=240, w=320, top=top, height=height, width=width, left=round(320 * 0.514 - width / 2))
+    want = np.asarray(Image.fromarray(mask).resize((44, 64), Image.BILINEAR), dtype=np.float32) / 255.0
+    for sil in casia_clip_frames(_crops([mask, mask, mask])):
+        np.testing.assert_array_equal(sil, want)
+
+
+def test_casia_clip_frames_keeps_movement_and_empty_frames():
+    from app.ml.silhouettes import casia_clip_frames
+
+    empty = np.zeros((480, 640), np.uint8)
+    masks = [person_mask(h=480, w=640, top=100, height=200, width=50, left=x) for x in (250, 300, 350)]
+    sils = casia_clip_frames(_crops([empty, *masks]))
+    assert sils[0] is None
+    centres = [_cols(s).mean() for s in sils[1:]]
+    assert centres[0] < centres[1] < centres[2]
+    assert all(s.shape == (64, 44) and s.dtype == np.float32 for s in sils[1:])
