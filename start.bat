@@ -8,7 +8,7 @@ cd /d "%~dp0"
 
 rem A .bat file can't have its own icon, so make a "Swalker" shortcut with the duck icon next to
 rem this file (once; a shortcut holds full paths, so each machine makes its own).
-if not exist "Swalker.lnk" powershell -NoProfile -Command "$s = (New-Object -ComObject WScript.Shell).CreateShortcut('%~dp0Swalker.lnk'); $s.TargetPath = '%~dp0start.bat'; $s.WorkingDirectory = '%~dp0'; $s.IconLocation = '%~dp0swalker.ico'; $s.Save()"
+if not exist "Swalker.lnk" powershell -NoProfile -Command "$s = (New-Object -ComObject WScript.Shell).CreateShortcut('%~dp0Swalker.lnk'); $s.TargetPath = '%~dp0start.bat'; $s.WorkingDirectory = '%~dp0'; $s.IconLocation = '%~dp0frontend\src\assets\swalker.ico'; $s.Save()"
 
 if not exist "backend\.venv\Scripts\python.exe" (
     echo The backend's Python environment is missing: backend\.venv
