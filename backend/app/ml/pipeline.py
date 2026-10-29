@@ -10,7 +10,14 @@ from typing import Protocol
 import numpy as np
 
 from app.config import Settings
-from app.ml.silhouettes import PREPROCESSORS, central_window, check_enough, crop_to_person, pick_display
+from app.ml.silhouettes import (
+    PREPROCESSORS,
+    PersonCrop,
+    central_window,
+    check_enough,
+    crop_to_person,
+    pick_display,
+)
 
 # report(stage, fraction of that stage done); stages: detecting, silhouettes, embedding.
 Progress = Callable[[str, float], None]
@@ -45,7 +52,7 @@ class GaitPipeline:
         self.segmenter = segmenter
         self.embedder = embedder
         self.settings = settings
-        self.to_silhouette = PREPROCESSORS[settings.preprocess_mode]
+        self.to_silhouettes = PREPROCESSORS[settings.preprocess_mode]
         # One video at a time: YOLO and GLTNet share the GPU, and CPU runs are already slow.
         self._lock = threading.Lock()
 
@@ -61,7 +68,7 @@ class GaitPipeline:
         with self._lock:
             # 1. Find the walker in every frame. Only a small crop around them is kept.
             report("detecting", 0.0)
-            crops: list[np.ndarray] = []
+            crops: list[PersonCrop] = []
             frames_total = 0
             with closing(iter(self.segmenter.masks(video_path))) as masks:
                 for mask in masks:
@@ -75,9 +82,9 @@ class GaitPipeline:
                     if frames_total >= max_read:
                         break
 
-            # 2. Turn each crop into a 64x44 silhouette.
+            # 2. Turn the crops into 64x44 silhouettes.
             report("silhouettes", 0.0)
-            silhouettes = [s for s in (self.to_silhouette(c) for c in crops) if s is not None]
+            silhouettes = [s for s in self.to_silhouettes(crops) if s is not None]
             check_enough(len(silhouettes), self.settings.min_frames)
             used = central_window(silhouettes, self.settings.max_frames)
 

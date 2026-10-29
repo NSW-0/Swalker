@@ -11,11 +11,15 @@ the background behind each item, see `HANDOFF.md`. For running the backend, see 
   Only `feat` is used. YOLOv8n-seg also loads once. If loading fails, the API still starts and
   `/api/health` says why.
 - **Video to silhouettes**, rebuilt from the old `silhouette_extractor.py`:
-  - CASIA-B style framing by default, ported from the training code's
-    `CCPG_MATCH_CASIA_GEOMETRY`: crop to the person, height 50.1% of the frame, width squashed
-    by 0.52, bbox top at 23.3%, greyscale kept (HANDOFF §6.1). The spec doesn't fix the
-    horizontal position, so the person is centred. The old tight crop is still available as
-    `SWALKER_PREPROCESS_MODE=crop`. The Archive records the framing version.
+  - CASIA-B style framing by default (`casia_clip`), using the training code's
+    `CCPG_MATCH_CASIA_GEOMETRY` numbers: height 50.1% of the frame, width squashed by 0.52, bbox
+    top at 23.3%, centre at 51.4%, greyscale kept (HANDOFF §6.1). One scale and position is used
+    for the whole clip, so each frame keeps the size changes, bobbing and movement across the
+    frame that the camera saw. Per-frame framing (`casia`) and the old tight crop (`crop`) are
+    still selectable. The Archive records the framing and its version.
+  - Measured on CASIA-B (2026-10-28, `casia_eval`, pooled Rank-1 NM / BG / CL, CASIA-B's own
+    masks): training-side framing 99.27 / 93.26 / 72.36, `casia_clip` 97.82 / 90.06 / 56.64,
+    `casia` 96.09 / 78.05 / 35.73, `crop` 69.45 / 41.17 / 12.09.
   - Frames are fed in order and consecutive, up to 120. No more spreading 30 frames across the
     clip (§6.2).
   - **Walker tracking:** the same person is followed across frames by box overlap. Before, each
@@ -49,12 +53,12 @@ the background behind each item, see `HANDOFF.md`. For running the backend, see 
   - `casia_eval`, for Kaggle: first checks that `train` mode reproduces the known baseline
     (NM 99.27 / BG 93.26 / CL 72.36) and marks the threshold untrusted if not; then Rank-1 for each
     preprocessing mode in three protocols (with counts like 796/1100), genuine/impostor distances
-    and a threshold table. Detects flat, nested and wrapped dataset layouts. Checked locally on a
-    tiny fake dataset only; **not yet run on real CASIA-B**
+    and a threshold table. Detects flat, nested and wrapped dataset layouts. Run on real CASIA-B on
+    Kaggle on 2026-10-28: baseline reproduced exactly
   - `embed_video` (determinism check)
   - `calibrate_threshold` (genuine vs impostor distances)
   - `import_gallery_pkl` (import an old `gallery.pkl`)
-- **Quality:** ruff (lint + format) and 66 pytest tests. A new GitHub Actions job,
+- **Quality:** ruff (lint + format) and 70 pytest tests. A new GitHub Actions job,
   `.github/workflows/backend-ci.yml`, runs them on PRs.
 
 ### Frontend (`frontend/`): wired to the real API, mock data removed
@@ -94,18 +98,13 @@ the background behind each item, see `HANDOFF.md`. For running the backend, see 
 
 1. **Record real walking clips** of the team and others: side view, whole body in frame, 3–5 s,
    2–3 clips per person (HANDOFF §7.5).
-2. **Calibrate the match threshold.** A first value can come from `scripts/casia_eval.py` on
-   Kaggle now, without recordings, but only if its baseline check passes. Then run `python -m scripts.calibrate_threshold videos\` on the
-   team's clips to check it, set `SWALKER_MATCH_THRESHOLD` in `backend/.env`, and set
-   `SWALKER_THRESHOLD_CALIBRATED=true`. Until then the 30 is a placeholder, and the Verdict page
-   says the match line is provisional.
-3. **Run `scripts/casia_eval.py` on Kaggle** (instructions at the top of the script):
-   - It must print `BASELINE OK` first. If it says `BASELINE NOT REPRODUCED`, send the output back:
-     the script's `train` mode or protocol differs from the training-side evaluation.
-   - Then compare Rank-1 of `casia` with `train` in the protocol that reproduced the baseline. If
-     `casia` is clearly lower, the website's framing needs more work (HANDOFF §6.1).
-   - Its threshold table gives the first `SWALKER_MATCH_THRESHOLD`.
-4. **Build the real Archive** from the recorded clips (Archive → "Add Case File").
+2. **Check the match threshold on real video.** It is 8.2, from `scripts/casia_eval.py` on
+   CASIA-B (1% false matches at the side view, 95.75% of same-person pairs accepted; see
+   `backend/README.md`). Then run `python -m scripts.calibrate_threshold videos\`
+   on the team's clips to check it, set `SWALKER_MATCH_THRESHOLD` in `backend/.env`, and set
+   `SWALKER_THRESHOLD_CALIBRATED=true`. Until then the Verdict page says the match line
+   is provisional.
+3. **Build the real Archive** from the recorded clips (Archive → "Add Case File").
 
 ## Known issues / notes
 - **The site is wider than a phone screen** (every page measures 454 px wide on a 390 px phone).

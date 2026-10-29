@@ -65,10 +65,10 @@ Every setting is optional; see `.env.example` and `app/config.py`. The important
 |---|---|---|
 | `SWALKER_CHECKPOINT_PATH` | `models/stage2_iter70000.pth` | swap in a newer checkpoint here; `n_classes` is read from it |
 | `SWALKER_DEVICE` | `auto` | `cpu` / `cuda` |
-| `SWALKER_PREPROCESS_MODE` | `casia` | `casia` = CASIA-B framing, greyscale (HANDOFF §6.1); `crop` = the old tight crop |
+| `SWALKER_PREPROCESS_MODE` | `casia_clip` | `casia_clip` = CASIA-B framing with one scale and position per clip; `casia` = the same per frame; `crop` = the old tight crop. Rank-1 for each in `app/ml/silhouettes.py` |
 | `SWALKER_TARGET_FPS` | `25` | clips are resampled to CASIA-B's frame rate first, so 60 fps phone video isn't slow motion to the model |
 | `SWALKER_MAX_FRAMES` | `120` | consecutive frames fed to the model (no subsampling, §6.2) |
-| `SWALKER_MATCH_THRESHOLD` | `30` | **provisional**, see below |
+| `SWALKER_MATCH_THRESHOLD` | `8.2` | from CASIA-B, not yet checked on real video, see below |
 
 ## Scripts
 
@@ -77,17 +77,21 @@ Run them from `backend/` with the venv active.
 | Command | What it does |
 |---|---|
 | `python -m scripts.embed_video clip.mp4 --save-silhouettes out\` | embeds a clip twice: shape, norm, identical? |
-| `python -m scripts.casia_eval --root <CASIA-B> --checkpoint <pth>` | on Kaggle: Rank-1 for `train` / `casia` / `crop` silhouettes (HANDOFF §6.1) plus genuine/impostor distances and a threshold table. Instructions at the top of the script |
+| `python -m scripts.casia_eval --root <CASIA-B> --checkpoint <pth>` | on Kaggle: Rank-1 for each preprocessing against the training-side framing (HANDOFF §6.1) plus genuine/impostor distances and a threshold table. Instructions at the top of the script |
 | `python -m scripts.calibrate_threshold videos\` | `videos\<person>\*.mp4`, at least 2 people × 2 clips. Prints genuine/impostor distances and the threshold at several false-match rates |
 | `python -m scripts.import_gallery_pkl gallery.pkl --preprocess-mode crop` | imports an old `gallery.pkl` |
 
 ## Not done yet / not measured
 
-- **Threshold:** 30 is a placeholder. Get a first value from `casia_eval` on Kaggle, check it with
-  `calibrate_threshold` on the team's recordings, put it in `.env`, and set
-  `SWALKER_THRESHOLD_CALIBRATED=true`. Until then the Verdict
-  page says the match line is provisional.
-- **Preprocessing:** `casia` is a port of the training code's `CCPG_MATCH_CASIA_GEOMETRY`
-  (`app/ml/silhouettes.py`), but its Rank-1 against `train`/`crop` on CASIA-B has **not been
-  measured** yet (`casia_eval` does it, after its baseline check).
+- **Threshold:** 8.2 comes from `casia_eval` on CASIA-B (2026-10-29, `casia_clip`, NM vs NM,
+  same view). At the side view (090) 8.23 lets 1% of different-person pairs through and accepts
+  95.75% of same-person pairs; over all 11 views 1% is at 9.07 (93.65% accepted). With N people in
+  the Archive, a stranger has roughly N times that 1% chance of landing under the line with
+  someone. It is still provisional: check it with `calibrate_threshold` on the team's recordings
+  (YOLO masks on real video are noisier than CASIA-B's), put the result in `.env`, and set
+  `SWALKER_THRESHOLD_CALIBRATED=true`. Until then the Verdict page says the match line is provisional.
+- **Preprocessing:** measured on CASIA-B with `casia_eval` (2026-10-28, pooled Rank-1,
+  NM / BG / CL): training-side framing 99.27 / 93.26 / 72.36, `casia_clip` 97.82 / 90.06 / 56.64,
+  `casia` 96.09 / 78.05 / 35.73, `crop` 69.45 / 41.17 / 12.09. That uses CASIA-B's own masks;
+  YOLO's mask errors on real video are not in these numbers.
 - `app/ml/combined_glfe_mstfe.py` is a frozen copy pinned to the checkpoint. Don't edit it here.

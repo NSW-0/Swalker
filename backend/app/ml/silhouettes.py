@@ -1,15 +1,19 @@
 """Video -> per-frame person masks (YOLOv8-seg) -> 64x44 silhouettes.
 
-Two ways to turn a mask into a silhouette (Settings.preprocess_mode):
+Ways to turn a clip's masks into silhouettes (Settings.preprocess_mode). Rank-1 on the CASIA-B
+test subjects, pooled protocol, NM / BG / CL, measured with scripts/casia_eval.py on 2026-10-28
+(the training-side framing, 'train', gets 99.27 / 93.26 / 72.36 there):
 
-- "casia" (default): frame the person the way CASIA-B silhouettes look, because that is what
-  GLTNet was trained on (the training code's CCPG_MATCH_CASIA_GEOMETRY): about half the frame
-  height, squashed narrow, soft greyscale edges (HANDOFF §6.1).
-- "crop": the original silhouette_extractor.py behaviour (tight crop, hard 0/1). Kept only so
-  the two can be compared on CASIA-B test data (scripts/casia_eval.py). Not measured yet.
+- "casia_clip" (default, 97.82 / 90.06 / 56.64): the person framed the way CASIA-B silhouettes
+  look (CCPG_MATCH_CASIA_GEOMETRY: about half the frame height, squashed narrow, soft greyscale
+  edges), with one scale and position for the whole clip, so the size changes, bobbing and
+  movement across the frame that a fixed camera records are kept (casia_sequence).
+- "casia" (96.09 / 78.05 / 35.73): the same framing applied to each frame on its own.
+- "crop" (69.45 / 41.17 / 12.09): the original silhouette_extractor.py tight crop, hard 0/1.
 """
 
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
+from dataclasses import dataclass
 from pathlib import Path
 
 import cv2
@@ -174,18 +178,25 @@ def _bbox(mask: np.ndarray) -> tuple[int, int, int, int] | None:
     return rows[0], rows[-1] + 1, cols[0], cols[-1] + 1
 
 
-def crop_to_person(mask: np.ndarray) -> np.ndarray | None:
+@dataclass
+class PersonCrop:
+    mask: np.ndarray  # uint8 0/255, the person's bounding box plus a zero margin
+    top: int  # where mask[0, 0] was in the frame (can be negative: the margin)
+    left: int
+
+
+def crop_to_person(mask: np.ndarray) -> PersonCrop | None:
     """The mask cut down to the person's bounding box plus a zero margin, so a clip's frames can be
     kept in memory between detecting and building silhouettes. Outside the bounding box the mask is
-    zero anyway, so casia_silhouette gives exactly the same result on this as on the full frame;
-    crop_silhouette does too unless the person touches the frame edge (there it used to clip its
-    5% padding at the edge, here the padding is always there)."""
+    zero anyway, so every preprocessing gives the same result on this as on the full frame
+    (crop_silhouette too, unless the person touches the frame edge: there it used to clip its 5%
+    padding at the edge, here the padding is always there)."""
     box = _bbox(mask)
     if box is None:
         return None
     top, bottom, left, right = box
     margin = max(2, (bottom - top) // 10)
-    return np.pad(mask[top:bottom, left:right], margin)
+    return PersonCrop(np.pad(mask[top:bottom, left:right], margin), int(top) - margin, int(left) - margin)
 
 
 def casia_silhouette(mask: np.ndarray) -> np.ndarray | None:
@@ -221,6 +232,69 @@ def casia_silhouette(mask: np.ndarray) -> np.ndarray | None:
     return np.clip(out, 0.0, 1.0)
 
 
+CASIA_CENTRE_X = 0.514  # horizontal centre / frame width (CASIA_REF_GEOMETRY['centroid_x'])
+
+
+def _frame_bbox(crop: PersonCrop | None) -> tuple[int, int, int, int] | None:
+    """The person's bounding box in frame coordinates."""
+    box = _bbox(crop.mask) if crop is not None else None
+    if box is None:
+        return None
+    top, bottom, left, right = box
+    return top + crop.top, bottom + crop.top, left + crop.left, right + crop.left
+
+
+def _paste(canvas: np.ndarray, patch: np.ndarray, x0: int, y0: int) -> None:
+    """Paste patch with its top-left corner at (x0, y0), clipped to the canvas."""
+    h, w = patch.shape
+    x1, y1 = max(0, x0), max(0, y0)
+    x2, y2 = min(canvas.shape[1], x0 + w), min(canvas.shape[0], y0 + h)
+    if x1 < x2 and y1 < y2:
+        canvas[y1:y2, x1:x2] = patch[y1 - y0 : y2 - y0, x1 - x0 : x2 - x0]
+
+
+def casia_sequence(crops: list[PersonCrop | None], follow_x: bool = False) -> list[np.ndarray | None]:
+    """The CASIA-B framing with one scale and one vertical offset for the whole clip.
+
+    casia_silhouette() normalises every frame on its own, which flattens what a fixed camera
+    records: the body's height changing through the stride, the head bobbing, the walker moving
+    across the frame. Here the clip's median person height becomes 50.1% of the frame and its
+    median top lands at 23.3%; each frame keeps its own size and height relative to that.
+    Horizontally each frame is centred at 51.4%, or with follow_x the clip's median centre is,
+    so the walker also moves across the frame as in CASIA-B.
+    """
+    boxes = [_frame_bbox(c) for c in crops]
+    found = np.array([b for b in boxes if b is not None], dtype=np.float64)
+    if found.size == 0:
+        return [None] * len(crops)
+    tops, bottoms, lefts, rights = found.T
+    frame_h, frame_w = IMG_H * SUPERSAMPLE, IMG_W * SUPERSAMPLE
+    sy = frame_h * CASIA_PERSON_HEIGHT / np.median(bottoms - tops)
+    sx = sy * CASIA_SQUASH
+    top_ref, cx_ref = np.median(tops), np.median((lefts + rights) / 2)
+
+    out: list[np.ndarray | None] = []
+    for crop, box in zip(crops, boxes, strict=True):
+        if box is None:
+            out.append(None)
+            continue
+        top, bottom, left, right = box
+        person = crop.mask[top - crop.top : bottom - crop.top, left - crop.left : right - crop.left]
+        person = person.astype(np.float32) / 255.0
+        size = (max(1, round((right - left) * sx)), max(1, round((bottom - top) * sy)))
+        person = cv2.resize(person, size, interpolation=cv2.INTER_AREA)
+        cx = cx_ref if follow_x else (left + right) / 2
+        frame = np.zeros((frame_h, frame_w), np.float32)
+        _paste(
+            frame,
+            person,
+            round(frame_w * CASIA_CENTRE_X + (left - cx) * sx),
+            round(frame_h * CASIA_BBOX_TOP + (top - top_ref) * sy),
+        )
+        out.append(np.clip(cv2.resize(frame, (IMG_W, IMG_H), interpolation=cv2.INTER_AREA), 0.0, 1.0))
+    return out
+
+
 def crop_silhouette(mask: np.ndarray) -> np.ndarray | None:
     """Original silhouette_extractor.py framing: tight crop + 5% padding, hard 0/1."""
     box = _bbox(mask)
@@ -235,8 +309,18 @@ def crop_silhouette(mask: np.ndarray) -> np.ndarray | None:
     return (out > 127).astype(np.float32)
 
 
-PREPROCESSORS = {"casia": casia_silhouette, "crop": crop_silhouette}
-PREPROCESS_VERSIONS = {"casia": CASIA_GEOMETRY_VERSION, "crop": 1}
+def _per_frame(fn: Callable[[np.ndarray], np.ndarray | None]):
+    return lambda crops: [fn(c.mask) if c is not None else None for c in crops]
+
+
+# Each one turns a clip's crops into its silhouettes (None = no person in that frame).
+Preprocessor = Callable[[list[PersonCrop | None]], list[np.ndarray | None]]
+PREPROCESSORS: dict[str, Preprocessor] = {
+    "casia_clip": lambda crops: casia_sequence(crops, follow_x=True),
+    "casia": _per_frame(casia_silhouette),
+    "crop": _per_frame(crop_silhouette),
+}
+PREPROCESS_VERSIONS = {"casia_clip": 1, "casia": CASIA_GEOMETRY_VERSION, "crop": 1}
 
 
 def central_window(frames: list[np.ndarray], max_frames: int) -> list[np.ndarray]:

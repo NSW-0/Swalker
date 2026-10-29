@@ -23,7 +23,7 @@ from app.gallery.store import GalleryMeta, GalleryStore
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("pkl", type=Path)
-    parser.add_argument("--preprocess-mode", required=True, choices=["casia", "crop"])
+    parser.add_argument("--preprocess-mode", required=True, choices=["casia_clip", "casia", "crop"])
     parser.add_argument("--checkpoint", default=None, help="checkpoint file name (default: the configured one)")
     parser.add_argument("--target-fps", type=float, default=0.0, help="frame rate the vectors were made at (0 = all)")
     args = parser.parse_args()
