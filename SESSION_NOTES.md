@@ -6,59 +6,58 @@ Update this file at the end of each session.
 
 ## Current state
 
-- **`main`** has everything up to PR #13: clip-level framing `casia_clip` (website default),
-  threshold 8.2, `start.bat`, the `native*` diagnostic modes. `1bd0395` went to `main` without a
-  PR; it was decided to leave it.
-- **`nSawafta/housekeeping`** still has one unmerged commit, `ea4e6c3` (duck icon: `swalker.ico`
-  + `start.bat` makes a git-ignored `Swalker.lnk` shortcut). It needs a second PR.
-- **Branch `nSawafta/clip-drawing`** (this session's last work, waiting for a Kaggle run):
-  `silhouettes.casia_clip_frames` and the eval modes `native_bin` and `clip_pil`. **Not** the
-  website default yet: switch only if the run shows it helps.
+- **`main`** has everything up to PR #16: clip-level framing, `start.bat` with the duck icon
+  (`frontend/src/assets/swalker.ico`; `start.bat` makes a git-ignored `Swalker.lnk`), and the
+  diagnostic eval modes. `1bd0395` went to `main` without a PR; it was decided to leave it.
+- **Branch `nSawafta/clip-pil-default`** (PR not merged yet as of 2026-10-29): makes
+  `casia_clip` draw like training (`casia_clip_frames`, `PREPROCESS_VERSIONS` 2, so Archives
+  built with version 1 are flagged) and sets the threshold to 8.5 from its table.
 - **Backend checks:** 74 pytest tests pass and ruff is clean. Run them from `backend/` with
   `.venv\Scripts\python -m pytest` and `.venv\Scripts\python -m ruff check .`. The system Python
   has no ruff.
 - **Local Archive** (`backend/storage/gallery/`) is empty, so changing the framing breaks nothing.
 
-## Where the CL gap comes from (Kaggle run 2026-10-29)
+## How the website's framing was chosen (Kaggle runs 2026-10-28/29)
 
-Pooled Rank-1 NM / BG / CL; the `native*` modes undo parts of `casia_seq_x`
-(`native_geometry` in `casia_eval.py`):
+`casia_eval` on CASIA-B test subjects 075-124; `train` reproduces the training numbers exactly
+(`BASELINE OK`). Pooled Rank-1 NM / BG / CL:
 
-| mode | NM | BG | CL | differs from train by |
+| mode | NM | BG | CL | what it is |
 |---|---|---|---|---|
-| train | 99.27 | 93.26 | 72.36 | |
-| native | 97.27 | 91.79 | 64.27 | drawing only (binary mask, linear warp + area average) |
-| native_pos | 98.00 | 89.97 | 63.73 | drawing + per-clip scale |
-| native_scale | 97.73 | 91.25 | 61.55 | drawing + per-clip position |
-| casia_seq_x | 97.82 | 90.06 | 56.64 | drawing + scale + position (= website) |
+| train | 99.27 | 93.26 | 72.36 | the training loader; whole CASIA frame, can't be used on real video |
+| native_bin | 99.27 | 93.26 | 72.36 | train from a binarised mask: identical, CASIA-B PNGs are binary |
+| native | 97.27 | 91.79 | 64.27 | real geometry, website's old drawing (linear warp + area average) |
+| native_pos | 98.00 | 89.97 | 63.73 | old drawing + per-clip scale |
+| native_scale | 97.73 | 91.25 | 61.55 | old drawing + per-clip position |
+| **clip_pil** | **97.82** | **90.07** | **63.91** | **website now (`casia_clip` v2)**: per-clip scale + position, training's drawing |
+| casia_seq_x | 97.82 | 90.06 | 56.64 | `casia_clip` v1: per-clip scale + position, old drawing |
+| casia | 96.09 | 78.05 | 35.73 | per-frame framing |
+| casia_seq | 92.55 | 76.40 | 40.18 | per-clip scale, each frame centred |
+| crop | 69.45 | 41.17 | 12.09 | old `silhouette_extractor.py` crop |
 
-So the **drawing costs ~8 CL points** and is fixable. Scale alone costs ~0.5, position ~2.7,
-both together ~7.6 (they interact); those can't be kept for real video.
+Per-probe, all views (closest to the website): train 99.82 / 98.18 / 82.91, clip_pil
+99.64 / 95.99 / 74.45, casia_seq_x 99.36 / 96.81 / 66.91.
+
+The remaining ~8.5 CL points come from normalising each clip's scale and position, which real
+video needs (size and place in the frame depend on the camera). These numbers use CASIA-B's own
+masks; YOLO's mask quality on real video is **not** measured by them.
 
 ## Next steps, in order
 
-1. **Kaggle run on `nSawafta/clip-drawing`** (`git clone -b nSawafta/clip-drawing ...`, usual
-   command; check the modes line says `['train', 'casia_seq_x', 'native_bin', 'clip_pil']`,
-   ~40 min). The threshold table now defaults to `clip_pil`.
-   - `native_bin` vs `train`: what binarising the mask alone costs (the website only has binary
-     YOLO masks, so this part can't be fixed).
-   - `clip_pil` vs `casia_seq_x`: what training's drawing (binary 320x240 frame, PIL BILINEAR)
-     gains with the website's geometry.
-   - If `clip_pil` wins: add it to `PREPROCESSORS` as the new default (e.g. `casia_clip` version 2
-     in `PREPROCESS_VERSIONS`, which flags old Archives), set the threshold from its table,
-     update README / PROJECT_STATUS / HANDOFF §2 numbers.
-2. ~~Threshold run on Kaggle (casia_seq_x)~~ done 2026-10-29. Same Rank-1 as before, `BASELINE OK`. Threshold
-   table for `casia_seq_x` (= `casia_clip`), NM vs NM same view:
+1. **Merge `nSawafta/clip-pil-default`** (the user opens/merges the PR).
+2. Threshold for `clip_pil` (= `casia_clip` v2), NM vs NM same view, from the 2026-10-29 run:
 
    | views | 0.1% false match | 1% | 5% | 10% |
    |---|---|---|---|---|
-   | all 11 | 7.92 (83.48% genuine accepted) | 9.07 (93.65%) | 10.17 (97.05%) | 10.79 (98.17%) |
-   | 090 (side) | 7.31 (93.00%) | 8.23 (95.75%) | 9.42 (99.00%) | 10.05 (99.00%) |
+   | all 11 | 8.27 (86.63% genuine accepted) | 9.41 (95.00%) | 10.55 (97.71%) | 11.18 (98.40%) |
+   | 090 (side) | 7.47 (93.00%) | 8.52 (96.50%) | 9.65 (98.75%) | 10.29 (99.75%) |
 
-   Genuine median 6.50, impostor median 13.21 (all views).
-3. ~~Set the threshold for casia_seq_x~~ done: `match_threshold = 8.2` in `backend/app/config.py` (1% at the
-   side view, the view the recording guide asks for). `threshold_calibrated` stays False until
-   it's checked on real recordings with `scripts/calibrate_threshold`.
+   Set to 8.5 (1% at the side view, the view the recording guide asks for).
+   `threshold_calibrated` stays False until it's checked on real recordings with
+   `scripts/calibrate_threshold`. (The old 8.2 was for `casia_seq_x`.)
+3. The framing question (HANDOFF §6.1) is closed unless real recordings show a problem. Any
+   further `casia_eval` experiment: add a mode to `MODES` and put it in `DEFAULT_MODES` with
+   `train` (needed for the baseline check); a run is ~10 min per mode.
 4. **Not started:** averaging several clips per person (HANDOFF §7.5), and the phone-width
    layout (every page is 454 px wide on a 390 px phone; the shared shell, not one page).
 5. **Real recordings** (needs the team): record clips, run `scripts/calibrate_threshold`, build
@@ -78,9 +77,11 @@ both together ~7.6 (they interact); those can't be kept for real video.
   reading (4244 s of the last 6587 s run), probably a cold cache.
 - **The `casia_eval` cache** (`<out>_cache.npz`) is ignored when `CACHE_VERSION` or the list of
   modes changes. Bump `CACHE_VERSION` whenever an existing mode's output changes.
-- **`casia_seq_x` in the script and `casia_clip` on the website are the same function**
-  (`casia_sequence(..., follow_x=True)` in `backend/app/ml/silhouettes.py`). The script keeps the
-  old name so its cache resumes.
+- **Eval mode names vs website modes:** `clip_pil` in the script = `casia_clip` version 2 on the
+  website (`casia_clip_frames`); `casia_seq_x` = version 1 (`casia_sequence(..., follow_x=True)`).
+- **The silhouette drawing matters as much as the geometry.** The model was trained on PIL
+  BILINEAR shrinks of binary 320x240 frames; drawing the same shape with area averaging cost
+  ~7 CL points. Keep any new framing drawn through `casia_clip_frames`'s PIL path.
 - **The Archive records preprocess mode + version + checkpoint + fps.** Changing any of them
   flags existing Archives incompatible (rebuild needed). Bump `PREPROCESS_VERSIONS` in
   `silhouettes.py` when a framing's output changes.

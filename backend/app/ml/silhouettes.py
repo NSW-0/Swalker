@@ -1,14 +1,16 @@
 """Video -> per-frame person masks (YOLOv8-seg) -> 64x44 silhouettes.
 
 Ways to turn a clip's masks into silhouettes (Settings.preprocess_mode). Rank-1 on the CASIA-B
-test subjects, pooled protocol, NM / BG / CL, measured with scripts/casia_eval.py on 2026-10-28
+test subjects, pooled protocol, NM / BG / CL, measured with scripts/casia_eval.py on 2026-10-28/29
 (the training-side framing, 'train', gets 99.27 / 93.26 / 72.36 there):
 
-- "casia_clip" (default, 97.82 / 90.06 / 56.64): the person framed the way CASIA-B silhouettes
-  look (CCPG_MATCH_CASIA_GEOMETRY: about half the frame height, squashed narrow, soft greyscale
-  edges), with one scale and position for the whole clip, so the size changes, bobbing and
-  movement across the frame that a fixed camera records are kept (casia_sequence).
-- "casia" (96.09 / 78.05 / 35.73): the same framing applied to each frame on its own.
+- "casia_clip" (default, 97.82 / 90.07 / 63.91): the person framed the way CASIA-B silhouettes
+  look (CCPG_MATCH_CASIA_GEOMETRY: about half the frame height, squashed narrow), with one scale
+  and position for the whole clip, so the size changes, bobbing and movement across the frame
+  that a fixed camera records are kept; each frame drawn like the training loader, as a binary
+  320x240 frame shrunk with PIL BILINEAR (casia_clip_frames). Version 1 drew the same geometry
+  with area averaging (casia_sequence) and got 97.82 / 90.06 / 56.64.
+- "casia" (96.09 / 78.05 / 35.73): the CASIA-B framing applied to each frame on its own.
 - "crop" (69.45 / 41.17 / 12.09): the original silhouette_extractor.py tight crop, hard 0/1.
 """
 
@@ -360,11 +362,12 @@ def _per_frame(fn: Callable[[np.ndarray], np.ndarray | None]):
 # Each one turns a clip's crops into its silhouettes (None = no person in that frame).
 Preprocessor = Callable[[list[PersonCrop | None]], list[np.ndarray | None]]
 PREPROCESSORS: dict[str, Preprocessor] = {
-    "casia_clip": lambda crops: casia_sequence(crops, follow_x=True),
+    "casia_clip": casia_clip_frames,
     "casia": _per_frame(casia_silhouette),
     "crop": _per_frame(crop_silhouette),
 }
-PREPROCESS_VERSIONS = {"casia_clip": 1, "casia": CASIA_GEOMETRY_VERSION, "crop": 1}
+# casia_clip 2 = drawn like training (casia_clip_frames); 1 = area-averaged (casia_sequence).
+PREPROCESS_VERSIONS = {"casia_clip": 2, "casia": CASIA_GEOMETRY_VERSION, "crop": 1}
 
 
 def central_window(frames: list[np.ndarray], max_frames: int) -> list[np.ndarray]:
