@@ -98,12 +98,12 @@ the background behind each item, see `HANDOFF.md`. For running the backend, see 
 
 1. **Record real walking clips** of the team and others: side view, whole body in frame, 3–5 s,
    2–3 clips per person (HANDOFF §7.5).
-2. **Calibrate the match threshold.** The first value comes from `scripts/casia_eval.py` on
-   Kaggle, with the `casia_seq_x` threshold table (= the website's `casia_clip`); see
-   `SESSION_NOTES.md` for the exact command. Then run `python -m scripts.calibrate_threshold videos\`
+2. **Check the match threshold on real video.** It is 8.2, from `scripts/casia_eval.py` on
+   CASIA-B (1% false matches at the side view, 95.75% of same-person pairs accepted; see
+   `backend/README.md`). Then run `python -m scripts.calibrate_threshold videos\`
    on the team's clips to check it, set `SWALKER_MATCH_THRESHOLD` in `backend/.env`, and set
-   `SWALKER_THRESHOLD_CALIBRATED=true`. Until then the 30 is a placeholder, and the Verdict page
-   says the match line is provisional.
+   `SWALKER_THRESHOLD_CALIBRATED=true`. Until then the Verdict page says the match line
+   is provisional.
 3. **Build the real Archive** from the recorded clips (Archive → "Add Case File").
 
 ## Known issues / notes

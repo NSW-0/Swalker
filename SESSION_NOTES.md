@@ -1,13 +1,13 @@
 # Session notes: where the last Claude Code session stopped
 
-Last updated 2026-10-28. Read this after `HANDOFF.md`. It covers work in progress, the next
+Last updated 2026-10-29. Read this after `HANDOFF.md`. It covers work in progress, the next
 steps, and things learned the hard way. For what is built overall, see `PROJECT_STATUS.md`.
 Update this file at the end of each session.
 
 ## Current state
 
 - **Branch:** `nSawafta/eval-read-bytes`, pushed. The PR is **not opened yet**, on purpose: it
-  waits until the threshold below is set, so it lands as one change.
+  waited for the threshold, which is now set, so it can be opened.
   Commits on it, not yet on `main`:
   - `fbd982b` reads each CASIA-B PNG in one call (it was slow on Kaggle's network mount)
   - `c56f3be` adds clip-level framing modes (`casia_seq`, `casia_seq_x`) to `casia_eval`
@@ -40,24 +40,18 @@ YOLO's mask quality on real video is **not** measured by them.
 
 ## Next steps, in order
 
-1. **Get the threshold for `casia_clip`.** The script's threshold table now defaults to
-   `--calibrate-mode casia_seq_x`. Ask the user to run this in Kaggle:
-   ```
-   %cd /kaggle/working
-   !rm -rf Swalker
-   !git clone -b nSawafta/eval-read-bytes https://github.com/NSW-0/Swalker.git
-   %cd Swalker/backend
-   !python -m scripts.casia_eval --root /kaggle/input/datasets/nabeelsawafta/gaitdatasetb-silh --checkpoint /kaggle/input/datasets/bbiiggnn/gait-checkpoints/stage2_iter70000.pth --out /kaggle/working/casia_eval.json
-   ```
-   If `/kaggle/working/casia_eval_cache.npz` from the last run still exists, it resumes and
-   finishes in minutes; otherwise it takes about 110 minutes.
-2. **Set the threshold.** From the "Threshold, mode 'casia_seq_x'" table, pick a value (1% false
-   match is a sensible starting point) and set `match_threshold` in `backend/app/config.py`
-   (currently a placeholder of **30**, far above every distance seen, so everyone matches). Keep
-   `threshold_calibrated=False` until it's checked on the team's own recordings. Update the
-   README's "Not done yet" and `PROJECT_STATUS.md`.
-   - For reference only, the old `casia` framing gave: 5.66 at 0.1%, 6.43 at 1%, 7.19 at 5% and
-     7.65 at 10% false matches. Don't use these for `casia_clip`.
+1. ~~Threshold run on Kaggle~~ done 2026-10-29. Same Rank-1 as before, `BASELINE OK`. Threshold
+   table for `casia_seq_x` (= `casia_clip`), NM vs NM same view:
+
+   | views | 0.1% false match | 1% | 5% | 10% |
+   |---|---|---|---|---|
+   | all 11 | 7.92 (83.48% genuine accepted) | 9.07 (93.65%) | 10.17 (97.05%) | 10.79 (98.17%) |
+   | 090 (side) | 7.31 (93.00%) | 8.23 (95.75%) | 9.42 (99.00%) | 10.05 (99.00%) |
+
+   Genuine median 6.50, impostor median 13.21 (all views).
+2. ~~Set the threshold~~ done: `match_threshold = 8.2` in `backend/app/config.py` (1% at the
+   side view, the view the recording guide asks for). `threshold_calibrated` stays False until
+   it's checked on real recordings with `scripts/calibrate_threshold`.
 3. **Open the PR** for `nSawafta/eval-read-bytes` into `main` (the user opens or merges it).
 4. **Optional: close more of the CL gap** (56.64 vs 72.36). Ideas not tested yet:
    - Clean CASIA masks to the largest connected component before measuring the box, since
