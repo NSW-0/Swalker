@@ -2,11 +2,13 @@ import numpy as np
 import pytest
 
 from scripts.casia_eval import (
+    MODES,
     VIEWS,
     find_sequences,
     fmr_table,
     genuine_impostor,
     matches_baseline,
+    native_geometry,
     parse_expected,
     rank1,
     rank1_per_probe,
@@ -84,3 +86,23 @@ def test_layout_detection_flat_nested_and_wrapped(tmp_path):
     assert len(seqs) == 2 and "GaitDatasetB-silh" in layout
     with pytest.raises(SystemExit):
         find_sequences(tmp_path / "flat", range(90, 92))
+
+
+def _walk(n=8):
+    from tests.conftest import person_mask
+
+    return [
+        person_mask(h=240, w=320, top=50 + i, height=118 + 3 * (i % 3), width=30, left=60 + 25 * i) for i in range(n)
+    ]
+
+
+def test_native_geometry_with_nothing_kept_is_casia_seq_x():
+    frames = _walk()
+    for a, b in zip(MODES["casia_seq_x"](frames), native_geometry(False, False)(frames), strict=True):
+        assert np.abs(a - b).mean() < 0.005  # same transform; only edge rounding differs
+
+
+def test_native_mode_is_close_to_train_style():
+    frames = _walk()
+    for a, b in zip(MODES["train"](frames), MODES["native"](frames), strict=True):
+        assert np.abs(a - b).mean() < 0.01  # whole frame at its own scale: only the drawing differs
