@@ -96,28 +96,35 @@ function AddCaseFileDialog({
           void submit()
         }}
       >
-        <DialogTitle sx={{ fontWeight: 700 }}>{mode === 'new' ? 'Add Case File' : 'Add a clip'}</DialogTitle>
+        <DialogTitle sx={{ fontWeight: 700 }}>
+          {forPerson ? `Add a clip to ${forPerson}` : mode === 'new' ? 'Add Case File' : 'Add a clip'}
+        </DialogTitle>
         <DialogContent>
-          <ToggleButtonGroup
-            exclusive
-            fullWidth
-            size="small"
-            value={mode}
-            onChange={(_, value: 'new' | 'existing' | null) => {
-              if (value) setMode(value)
-              setError(null)
-            }}
-            sx={{ mb: 1.5 }}
-          >
-            <ToggleButton value="new">New person</ToggleButton>
-            <ToggleButton value="existing" disabled={people.length === 0}>
-              Existing person
-            </ToggleButton>
-          </ToggleButtonGroup>
+          {/* Opened from a case file's "Add clip": the person is already chosen. */}
+          {!forPerson && (
+            <ToggleButtonGroup
+              exclusive
+              fullWidth
+              size="small"
+              value={mode}
+              onChange={(_, value: 'new' | 'existing' | null) => {
+                if (value) setMode(value)
+                setError(null)
+              }}
+              sx={{ mb: 1.5 }}
+            >
+              <ToggleButton value="new">New person</ToggleButton>
+              <ToggleButton value="existing" disabled={people.length === 0}>
+                Existing person
+              </ToggleButton>
+            </ToggleButtonGroup>
+          )}
           <p className="archive-dialog-text">
             {mode === 'new'
               ? 'Upload a walking clip of someone new.'
-              : 'Another clip of someone already on file, e.g. carrying a bag or in a coat. New walks are compared with each of their clips.'}{' '}
+              : forPerson
+                ? `Another clip of ${forPerson}, e.g. carrying a bag or in a coat. New walks are compared with each of their clips.`
+                : 'Another clip of someone already on file, e.g. carrying a bag or in a coat. New walks are compared with each of their clips.'}{' '}
             Swalker keeps the gait signature and a few silhouettes; the video itself is not stored.
           </p>
           {mode === 'new' ? (
@@ -135,7 +142,7 @@ function AddCaseFileDialog({
               slotProps={{ htmlInput: { maxLength: 40 } }}
               sx={{ mt: 1, mb: 2 }}
             />
-          ) : (
+          ) : forPerson ? null : (
             <TextField
               select
               fullWidth
