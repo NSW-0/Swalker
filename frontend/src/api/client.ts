@@ -157,7 +157,14 @@ export function formatSize(bytes: number) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
-// Where a distance sits on a 0..1 scale: 0 = identical, 0.5 = the match line, 1 = twice as far.
-export function scalePosition(distance: number, threshold: number) {
-  return Math.max(0, Math.min(1, distance / (2 * threshold)))
+// The distance scale runs from 0 (identical) to scaleEnd: at least twice the match line, and far
+// enough that every suspect fits. Real clips often land at 10-20, well past twice the line, and
+// a fixed end would pile them all up against it.
+export function scaleEnd(threshold: number, distances: number[]) {
+  return Math.max(2 * threshold, Math.ceil(Math.max(0, ...distances) * 1.1))
+}
+
+// Where a distance sits on that scale, 0..1.
+export function scalePosition(distance: number, end: number) {
+  return Math.max(0, Math.min(1, distance / end))
 }

@@ -1,6 +1,6 @@
 # Session notes: where the last Claude Code session stopped
 
-Last updated 2026-10-29. Read this after `HANDOFF.md`. It covers work in progress, the next
+Last updated 2026-10-30. Read this after `HANDOFF.md`. It covers work in progress, the next
 steps, and things learned the hard way. For what is built overall, see `PROJECT_STATUS.md`.
 Update this file at the end of each session.
 
@@ -12,10 +12,30 @@ Update this file at the end of each session.
 - **Branch `nSawafta/clip-pil-default`** (PR not merged yet as of 2026-10-29): makes
   `casia_clip` draw like training (`casia_clip_frames`, `PREPROCESS_VERSIONS` 2, so Archives
   built with version 1 are flagged) and sets the threshold to 8.5 from its table.
+- **Branch `nSawafta/distance-scale`** (PR not opened as of 2026-10-30): the Verdict distance
+  scale stretches to the farthest suspect instead of clamping at twice the match line. Not looked
+  at in a browser yet; the user is checking it.
 - **Backend checks:** 74 pytest tests pass and ruff is clean. Run them from `backend/` with
   `.venv\Scripts\python -m pytest` and `.venv\Scripts\python -m ruff check .`. The system Python
   has no ruff.
 - **Local Archive** (`backend/storage/gallery/`) is empty, so changing the framing breaks nothing.
+
+## First real recordings (2026-10-30)
+
+Archive: 10 people, one normal side-view walk each (`C:\Users\nabee\Pictures\gait\`). Test clips
+in `C:\Users\nabee\Pictures\gait_test\`: `hamed_bag`, `hoda_bag`, `Nabeel_CL`. Measured with the
+real pipeline (`casia_clip` v2):
+
+- Archive vs Archive (all different people): min 9.80 (Hodayfah-Ibrahim), median 12.66, max 18.60.
+- hamed_bag: Hamed 12.66 (#1, next Raid 14.52). Nabeel_CL: Nabeel 11.24 (#1, next Mostafa
+  12.30). hoda_bag: Mohamad 10.53 (#1, **wrong**), Hodayfah 10.97 (#2).
+- So bag/coat distances to the right person (11-12.7) overlap with distances between different
+  people (from 9.8): no threshold separates them. **Not measured yet:** normal-vs-normal of the
+  same person on real video (asked the user for a second normal clip of 4-5 people).
+- The user set `SWALKER_MATCH_THRESHOLD=12` in the git-ignored `backend/.env` to try something;
+  the committed default is still 8.5. Delete that `.env` line to go back.
+- Suggested next: several clips per person in the Archive (match against the closest one), then
+  `calibrate_threshold` once there are second normal clips.
 
 ## How the website's framing was chosen (Kaggle runs 2026-10-28/29)
 
