@@ -6,19 +6,15 @@ Update this file at the end of each session.
 
 ## Current state
 
-- **`main`** has everything up to PR #16: clip-level framing, `start.bat` with the duck icon
-  (`frontend/src/assets/swalker.ico`; `start.bat` makes a git-ignored `Swalker.lnk`), and the
-  diagnostic eval modes. `1bd0395` went to `main` without a PR; it was decided to leave it.
-- **Branch `nSawafta/clip-pil-default`** (PR not merged yet as of 2026-10-29): makes
-  `casia_clip` draw like training (`casia_clip_frames`, `PREPROCESS_VERSIONS` 2, so Archives
-  built with version 1 are flagged) and sets the threshold to 8.5 from its table.
-- **Branch `nSawafta/distance-scale`** (PR not opened as of 2026-10-30): the Verdict distance
-  scale stretches to the farthest suspect instead of clamping at twice the match line. Not looked
-  at in a browser yet; the user is checking it.
-- **Backend checks:** 74 pytest tests pass and ruff is clean. Run them from `backend/` with
+- **`main`** has everything up to PR #20 (several clips per person). The full list of changes is
+  in `CHANGELOG.md`; keep it updated with every change.
+- **Branch `nSawafta/add-clip-for-person`** (PR not merged as of 2026-10-30): "Add clip" inside a
+  case file adds to that person without asking New / Existing.
+- The Archive on the user's machine has 10 people, one clip each (`index.json` still version 1
+  until the next change; it's read fine).
+- **Backend checks:** 81 pytest tests pass and ruff is clean. Run them from `backend/` with
   `.venv\Scripts\python -m pytest` and `.venv\Scripts\python -m ruff check .`. The system Python
   has no ruff.
-- **Local Archive** (`backend/storage/gallery/`) is empty, so changing the framing breaks nothing.
 
 ## First real recordings (2026-10-30)
 
