@@ -31,6 +31,13 @@ function errorMessage(e: unknown) {
   return e instanceof Error ? e.message : 'Something went wrong.'
 }
 
+// The case file name used when none is typed: the clip's file name without its extension, with
+// characters names can't have turned into spaces (same rule as the backend).
+function nameFromFile(file: File) {
+  const stem = file.name.replace(/\.[^.]*$/, '')
+  return stem.replace(/[^\p{L}\p{N}_ .'-]+/gu, ' ').split(/\s+/).join(' ').trim().slice(0, 40).trim()
+}
+
 function AddCaseFileDialog({ open, onClose, onAdded }: { open: boolean; onClose: () => void; onAdded: (c: CaseFileDetail) => void }) {
   const limits = useUploadLimits()
   const inputRef = useRef<HTMLInputElement>(null)
@@ -38,6 +45,8 @@ function AddCaseFileDialog({ open, onClose, onAdded }: { open: boolean; onClose:
   const [clip, setClip] = useState<File | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const fallbackName = clip ? nameFromFile(clip) : ''
+  const finalName = name.trim() || fallbackName
 
   const reset = () => {
     setName('')
@@ -46,11 +55,11 @@ function AddCaseFileDialog({ open, onClose, onAdded }: { open: boolean; onClose:
   }
 
   const submit = async () => {
-    if (!clip || name.trim() === '' || busy) return
+    if (!clip || finalName === '' || busy) return
     setBusy(true)
     setError(null)
     try {
-      const added = await api.addFromVideo(name.trim(), clip)
+      const added = await api.addFromVideo(finalName, clip)
       reset()
       onAdded(added)
     } catch (e) {
@@ -78,6 +87,8 @@ function AddCaseFileDialog({ open, onClose, onAdded }: { open: boolean; onClose:
             autoFocus
             fullWidth
             label="Case file name"
+            placeholder={fallbackName || undefined}
+            helperText={fallbackName ? `Leave empty to use the clip's name: ${fallbackName}` : 'Optional: the clip\'s name is used if left empty'}
             value={name}
             onChange={(e) => {
               setName(e.target.value)
@@ -129,7 +140,7 @@ function AddCaseFileDialog({ open, onClose, onAdded }: { open: boolean; onClose:
           <Button onClick={onClose} disabled={busy} sx={{ color: 'var(--muted)' }}>
             Cancel
           </Button>
-          <Button type="submit" variant="contained" disabled={!clip || name.trim() === '' || busy} sx={{ borderRadius: '999px', px: 3 }}>
+          <Button type="submit" variant="contained" disabled={!clip || finalName === '' || busy} sx={{ borderRadius: '999px', px: 3 }}>
             {busy ? 'Adding…' : 'Add'}
           </Button>
         </DialogActions>

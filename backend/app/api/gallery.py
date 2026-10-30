@@ -4,7 +4,7 @@ from pydantic import BaseModel, Field
 from app.api.serialize import entry_detail, entry_summary
 from app.api.uploads import saved_upload
 from app.errors import ApiError
-from app.gallery.store import validate_name
+from app.gallery.store import name_from_filename, validate_name
 from app.state import AppState, get_state
 
 router = APIRouter()
@@ -60,12 +60,12 @@ def save_query(body: SaveQuery, state: AppState = Depends(get_state)):
 
 @router.post("/gallery/from-video", status_code=201)
 def add_from_video(
-    name: str = Form(max_length=200),
+    name: str = Form("", max_length=200),
     video: UploadFile = File(...),
     state: AppState = Depends(get_state),
 ):
-    # Cheap checks before the slow part.
-    name = validate_name(name)
+    # Cheap checks before the slow part. No name typed: the clip's file name is used.
+    name = validate_name(name if name.strip() else name_from_filename(video.filename or ""))
     state.store.require_compatible()
     if state.store.name_taken(name):
         raise ApiError("name_taken", f"A case file named '{name}' already exists.", 409)

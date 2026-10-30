@@ -34,8 +34,16 @@ real pipeline (`casia_clip` v2):
   same person on real video (asked the user for a second normal clip of 4-5 people).
 - The user set `SWALKER_MATCH_THRESHOLD=12` in the git-ignored `backend/.env` to try something;
   the committed default is still 8.5. Delete that `.env` line to go back.
-- Suggested next: several clips per person in the Archive (match against the closest one), then
-  `calibrate_threshold` once there are second normal clips.
+- Tried and rejected (2026-10-30): judging each distance against that person's usual distance
+  to the others (z-norm, or ratio to their nearest other). hoda_bag stays wrong (Mohamad -1.00
+  vs Hodayfah -0.99 z-norm; rank 4 by ratio). The Archive by then also held `Nabeel_Cl` (the coat
+  clip added as its own case file), so Nabeel_CL can't be used as a test clip any more.
+- Options given to the user (2026-10-30), in order: (1) second normal clip + second bag clip
+  for 4-5 people, to measure normal-vs-normal and to test (2); (2) several clips per person in
+  the Archive, matched by the closest clip and shown under one name; (3) a "possible match"
+  band between the line and ~12 when #1 leads #2 clearly (margin needs data: right answers led
+  by 1.86 and 1.06, the wrong one by 0.44); (4) consistent recording setup. Retraining is out of
+  scope (CLAUDE.md).
 
 ## How the website's framing was chosen (Kaggle runs 2026-10-28/29)
 
