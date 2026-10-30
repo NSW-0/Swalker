@@ -7,14 +7,17 @@ import DialogActions from '@mui/material/DialogActions'
 import DialogTitle from '@mui/material/DialogTitle'
 import DialogContent from '@mui/material/DialogContent'
 import IconButton from '@mui/material/IconButton'
+import MenuItem from '@mui/material/MenuItem'
 import TextField from '@mui/material/TextField'
+import ToggleButton from '@mui/material/ToggleButton'
+import ToggleButtonGroup from '@mui/material/ToggleButtonGroup'
 import CloseIcon from '@mui/icons-material/Close'
 import AddOutlinedIcon from '@mui/icons-material/AddOutlined'
 import UploadFileOutlinedIcon from '@mui/icons-material/UploadFileOutlined'
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined'
 import DeleteOutlinedIcon from '@mui/icons-material/DeleteOutlined'
 import { api, ApiError, checkVideo, formatSize } from '../api/client'
-import type { CaseFile, CaseFileDetail } from '../api/client'
+import type { CaseFile, CaseFileDetail, ClipInfo } from '../api/client'
 import { useUploadLimits } from '../api/useUploadLimits'
 import { SilhouetteStrip, SilhouetteThumb } from '../components/verdict/Silhouettes'
 import duckSmoking from '../assets/duck_smoking.png'
@@ -38,15 +41,31 @@ function nameFromFile(file: File) {
   return stem.replace(/[^\p{L}\p{N}_ .'-]+/gu, ' ').split(/\s+/).join(' ').trim().slice(0, 40).trim()
 }
 
-function AddCaseFileDialog({ open, onClose, onAdded }: { open: boolean; onClose: () => void; onAdded: (c: CaseFileDetail) => void }) {
+// Adds a new person, or another clip of someone already on file (forPerson preselects them).
+function AddCaseFileDialog({
+  open,
+  people,
+  forPerson,
+  onClose,
+  onAdded,
+}: {
+  open: boolean
+  people: string[]
+  forPerson: string | null
+  onClose: () => void
+  onAdded: (c: CaseFileDetail) => void
+}) {
   const limits = useUploadLimits()
   const inputRef = useRef<HTMLInputElement>(null)
+  const [mode, setMode] = useState<'new' | 'existing'>(forPerson ? 'existing' : 'new')
+  const [person, setPerson] = useState(forPerson ?? '')
   const [name, setName] = useState('')
   const [clip, setClip] = useState<File | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const fallbackName = clip ? nameFromFile(clip) : ''
   const finalName = name.trim() || fallbackName
+  const ready = clip !== null && (mode === 'new' ? finalName !== '' : person !== '')
 
   const reset = () => {
     setName('')
@@ -55,11 +74,11 @@ function AddCaseFileDialog({ open, onClose, onAdded }: { open: boolean; onClose:
   }
 
   const submit = async () => {
-    if (!clip || finalName === '' || busy) return
+    if (!clip || !ready || busy) return
     setBusy(true)
     setError(null)
     try {
-      const added = await api.addFromVideo(finalName, clip)
+      const added = mode === 'new' ? await api.addFromVideo(finalName, clip) : await api.addClipFromVideo(person, clip)
       reset()
       onAdded(added)
     } catch (e) {
@@ -77,26 +96,64 @@ function AddCaseFileDialog({ open, onClose, onAdded }: { open: boolean; onClose:
           void submit()
         }}
       >
-        <DialogTitle sx={{ fontWeight: 700 }}>Add Case File</DialogTitle>
+        <DialogTitle sx={{ fontWeight: 700 }}>{mode === 'new' ? 'Add Case File' : 'Add a clip'}</DialogTitle>
         <DialogContent>
-          <p className="archive-dialog-text">
-            Upload a walking clip of someone new. Swalker keeps their gait signature and a few silhouettes; the
-            video itself is not stored.
-          </p>
-          <TextField
-            autoFocus
+          <ToggleButtonGroup
+            exclusive
             fullWidth
-            label="Case file name"
-            placeholder={fallbackName || undefined}
-            helperText={fallbackName ? `Leave empty to use the clip's name: ${fallbackName}` : 'Optional: the clip\'s name is used if left empty'}
-            value={name}
-            onChange={(e) => {
-              setName(e.target.value)
+            size="small"
+            value={mode}
+            onChange={(_, value: 'new' | 'existing' | null) => {
+              if (value) setMode(value)
               setError(null)
             }}
-            slotProps={{ htmlInput: { maxLength: 40 } }}
-            sx={{ mt: 1, mb: 2 }}
-          />
+            sx={{ mb: 1.5 }}
+          >
+            <ToggleButton value="new">New person</ToggleButton>
+            <ToggleButton value="existing" disabled={people.length === 0}>
+              Existing person
+            </ToggleButton>
+          </ToggleButtonGroup>
+          <p className="archive-dialog-text">
+            {mode === 'new'
+              ? 'Upload a walking clip of someone new.'
+              : 'Another clip of someone already on file, e.g. carrying a bag or in a coat. New walks are compared with each of their clips.'}{' '}
+            Swalker keeps the gait signature and a few silhouettes; the video itself is not stored.
+          </p>
+          {mode === 'new' ? (
+            <TextField
+              autoFocus
+              fullWidth
+              label="Case file name"
+              placeholder={fallbackName || undefined}
+              helperText={fallbackName ? `Leave empty to use the clip's name: ${fallbackName}` : 'Optional: the clip\'s name is used if left empty'}
+              value={name}
+              onChange={(e) => {
+                setName(e.target.value)
+                setError(null)
+              }}
+              slotProps={{ htmlInput: { maxLength: 40 } }}
+              sx={{ mt: 1, mb: 2 }}
+            />
+          ) : (
+            <TextField
+              select
+              fullWidth
+              label="Person"
+              value={person}
+              onChange={(e) => {
+                setPerson(e.target.value)
+                setError(null)
+              }}
+              sx={{ mt: 1, mb: 2 }}
+            >
+              {people.map((id) => (
+                <MenuItem key={id} value={id}>
+                  {id}
+                </MenuItem>
+              ))}
+            </TextField>
+          )}
           <input
             ref={inputRef}
             type="file"
@@ -140,7 +197,7 @@ function AddCaseFileDialog({ open, onClose, onAdded }: { open: boolean; onClose:
           <Button onClick={onClose} disabled={busy} sx={{ color: 'var(--muted)' }}>
             Cancel
           </Button>
-          <Button type="submit" variant="contained" disabled={!clip || finalName === '' || busy} sx={{ borderRadius: '999px', px: 3 }}>
+          <Button type="submit" variant="contained" disabled={!ready || busy} sx={{ borderRadius: '999px', px: 3 }}>
             {busy ? 'Adding…' : 'Add'}
           </Button>
         </DialogActions>
@@ -149,13 +206,82 @@ function AddCaseFileDialog({ open, onClose, onAdded }: { open: boolean; onClose:
   )
 }
 
+// Each clip of a person: its silhouettes and signature, and a remove button (asks first) when
+// they have more than one.
+function ClipList({ personId, clips, onChanged }: { personId: string; clips: ClipInfo[]; onChanged: (c: CaseFileDetail) => void }) {
+  const [confirming, setConfirming] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const remove = async (clipId: string) => {
+    setBusy(true)
+    setError(null)
+    try {
+      onChanged(await api.removeClip(personId, clipId))
+      setConfirming(null)
+    } catch (e) {
+      setError(errorMessage(e))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="archive-clips">
+      {clips.map((clip, i) => (
+        <div key={clip.clipId} className="archive-clip">
+          <div className="archive-clip-head">
+            <span className="archive-clip-title">
+              Clip {i + 1} · <b>{clip.videoPath}</b> <span className="archive-detail-note">(not stored)</span>
+            </span>
+            <span className="archive-clip-date">{new Date(clip.addedAt).toLocaleString()}</span>
+            {clips.length > 1 &&
+              (confirming === clip.clipId ? (
+                <span className="archive-clip-confirm">
+                  Remove this clip?
+                  <Button size="small" onClick={() => setConfirming(null)} disabled={busy} sx={{ color: 'var(--muted)' }}>
+                    Keep
+                  </Button>
+                  <Button size="small" color="error" onClick={() => void remove(clip.clipId)} disabled={busy}>
+                    {busy ? 'Removing…' : 'Remove'}
+                  </Button>
+                </span>
+              ) : (
+                <Button
+                  size="small"
+                  startIcon={<DeleteOutlinedIcon />}
+                  onClick={() => {
+                    setConfirming(clip.clipId)
+                    setError(null)
+                  }}
+                  sx={{ color: 'var(--muted)' }}
+                >
+                  Remove
+                </Button>
+              ))}
+          </div>
+          <SilhouetteStrip frames={clip.silhouetteUrls} className="archive-sil-strip" />
+          <div className="archive-vector-box">
+            <span className="archive-badge">{clip.featureDim}-dim vector</span>
+            <span className="archive-badge">L2 norm {clip.l2Norm.toFixed(3)}</span>
+            <p className="archive-vector-preview">[{clip.vectorPreview.map((v) => v.toFixed(4)).join(', ')}, …]</p>
+          </div>
+        </div>
+      ))}
+      {error && <p className="archive-dialog-text archive-dialog-error">{error}</p>}
+    </div>
+  )
+}
+
 // Rename / delete at the bottom of an open case file. Delete asks first, inside the dialog.
 function CaseFileActions({
   personId,
+  onAddClip,
   onRenamed,
   onDeleted,
 }: {
   personId: string
+  onAddClip: () => void
   onRenamed: (c: CaseFileDetail) => void
   onDeleted: () => void
 }) {
@@ -226,8 +352,8 @@ function CaseFileActions({
     return (
       <div className="archive-actions archive-actions-delete" role="alertdialog" aria-label="Confirm delete">
         <p className="archive-dialog-text">
-          Delete <b>{personId}</b>? Their gait signature and silhouettes are removed for good, and Swalker won't
-          recognise them any more.
+          Delete <b>{personId}</b>? All their clips' gait signatures and silhouettes are removed for good, and
+          Swalker won't recognise them any more.
         </p>
         {error && <p className="archive-dialog-text archive-dialog-error">{error}</p>}
         <div className="archive-actions-row">
@@ -244,6 +370,9 @@ function CaseFileActions({
 
   return (
     <div className="archive-actions archive-actions-row">
+      <Button startIcon={<AddOutlinedIcon />} onClick={onAddClip} sx={{ color: 'var(--muted)', mr: 'auto' }}>
+        Add clip
+      </Button>
       <Button startIcon={<EditOutlinedIcon />} onClick={() => setMode('rename')} sx={{ color: 'var(--muted)' }}>
         Rename
       </Button>
@@ -258,6 +387,7 @@ export default function Archive() {
   const [entries, setEntries] = useState<CaseFile[] | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [addOpen, setAddOpen] = useState(false)
+  const [addFor, setAddFor] = useState<string | null>(null) // add a clip to this person
 
   // /archive?person=person_021 opens that case file straight away
   // (used after saving an unknown walker on the Verdict page).
@@ -329,7 +459,14 @@ export default function Archive() {
           <p className="archive-status">The Archive is empty. Add the first case file to start recognising walkers.</p>
         )}
         <div className="archive-grid">
-          <button type="button" className="archive-card archive-card-add" onClick={() => setAddOpen(true)}>
+          <button
+            type="button"
+            className="archive-card archive-card-add"
+            onClick={() => {
+              setAddFor(null)
+              setAddOpen(true)
+            }}
+          >
             <AddOutlinedIcon className="archive-card-add-icon" />
             <p className="archive-card-id">Add Case File</p>
           </button>
@@ -341,7 +478,9 @@ export default function Archive() {
               </span>
               <div>
                 <p className="archive-card-id">{entry.personId}</p>
-                <p className="archive-card-hint">View case file →</p>
+                <p className="archive-card-hint">
+                  {entry.clipCount > 1 ? `${entry.clipCount} clips · ` : ''}View case file →
+                </p>
               </div>
             </button>
           ))}
@@ -361,21 +500,26 @@ export default function Archive() {
           {shown && (
             <>
               <p className="archive-detail-row">
-                <span className="archive-detail-label">Video:</span>
-                {shown.videoPath} <span className="archive-detail-note">(not stored)</span>
-              </p>
-              <p className="archive-detail-row">
                 <span className="archive-detail-label">Added:</span>
                 {new Date(shown.addedAt).toLocaleString()}
               </p>
+              <p className="archive-detail-row">
+                <span className="archive-detail-label">Clips:</span>
+                {shown.clipCount}
+                <span className="archive-detail-note">
+                  {' '}
+                  (a new walk is compared with each; add clips with a bag or a coat to recognise those too)
+                </span>
+              </p>
 
-              <SilhouetteStrip frames={shown.silhouetteUrls} className="archive-sil-strip" />
-
-              <div className="archive-vector-box">
-                <span className="archive-badge">{shown.featureDim}-dim vector</span>
-                <span className="archive-badge">L2 norm {shown.l2Norm.toFixed(3)}</span>
-                <p className="archive-vector-preview">[{shown.vectorPreview.map((v) => v.toFixed(4)).join(', ')}, …]</p>
-              </div>
+              <ClipList
+                personId={shown.personId}
+                clips={shown.clips}
+                onChanged={(changed) => {
+                  setDetail(changed)
+                  load()
+                }}
+              />
             </>
           )}
         </DialogContent>
@@ -384,6 +528,10 @@ export default function Archive() {
             <CaseFileActions
               key={shown.personId}
               personId={shown.personId}
+              onAddClip={() => {
+                setAddFor(shown.personId)
+                setAddOpen(true)
+              }}
               onRenamed={(renamed) => {
                 setDetail(renamed)
                 setSearchParams({ person: renamed.personId }, { replace: true })
@@ -399,12 +547,16 @@ export default function Archive() {
       </Dialog>
 
       <AddCaseFileDialog
+        key={addFor ?? '(new)'}
         open={addOpen}
+        people={entries?.map((e) => e.personId) ?? []}
+        forPerson={addFor}
         onClose={() => setAddOpen(false)}
         onAdded={(added) => {
           setAddOpen(false)
           load()
-          openCase(added.personId)
+          if (added.personId === selectedId) setDetail(added)
+          else openCase(added.personId)
         }}
       />
 

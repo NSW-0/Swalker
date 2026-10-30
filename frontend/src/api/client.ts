@@ -8,8 +8,10 @@ export interface Suspect {
   distance: number
   // Relative between the suspects shown (they add up to 100). Not a probability.
   confidence: number
+  clipCount: number // how many clips this person has in the Archive
+  matchedClip: string // which of them was closest (its file name)
   thumbnailUrl: string | null
-  silhouetteUrls: string[]
+  silhouetteUrls: string[] // of that closest clip
 }
 
 export interface VerdictResult {
@@ -38,18 +40,32 @@ export interface JobStatus {
   error?: { error: string; message: string }
 }
 
+// A person in the Archive. videoPath, the vector fields and the thumbnail are their first clip's.
 export interface CaseFile {
   personId: string
   videoPath: string
   addedAt: string
+  clipCount: number
   vectorPreview: number[]
   l2Norm: number
   featureDim: number
   thumbnailUrl: string | null
 }
 
+// One clip of a person: its own gait signature and silhouettes.
+export interface ClipInfo {
+  clipId: string
+  videoPath: string
+  addedAt: string
+  vectorPreview: number[]
+  l2Norm: number
+  featureDim: number
+  silhouetteUrls: string[]
+}
+
 export interface CaseFileDetail extends CaseFile {
   silhouetteUrls: string[]
+  clips: ClipInfo[]
 }
 
 export interface Health {
@@ -75,6 +91,7 @@ const FRIENDLY: Record<string, string> = {
   gallery_incompatible: 'The Archive was built with different settings and has to be rebuilt.',
   query_expired: 'This investigation has gone cold. Investigate the clip again to save it.',
   name_taken: 'A case file with this name already exists.',
+  last_clip: 'This is their only clip. Delete the case file instead.',
   job_not_found: 'This investigation was lost (the server may have restarted). Investigate the clip again.',
   server_error: 'Something went wrong on the server while investigating this clip.',
   network: "Can't reach the Swalker server. Is the backend running?",
@@ -135,6 +152,22 @@ export const api = {
     }),
   deleteCaseFile: (personId: string) =>
     request<null>(`/api/gallery/${encodeURIComponent(personId)}`, { method: 'DELETE' }),
+  // More clips of someone already in the Archive (another day, a bag, a coat).
+  addClipFromQuery: (personId: string, queryId: string) =>
+    request<CaseFileDetail>(`/api/gallery/${encodeURIComponent(personId)}/clips`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ queryId }),
+    }),
+  addClipFromVideo: (personId: string, video: File) =>
+    request<CaseFileDetail>(`/api/gallery/${encodeURIComponent(personId)}/clips/from-video`, {
+      method: 'POST',
+      body: videoForm(video),
+    }),
+  removeClip: (personId: string, clipId: string) =>
+    request<CaseFileDetail>(`/api/gallery/${encodeURIComponent(personId)}/clips/${encodeURIComponent(clipId)}`, {
+      method: 'DELETE',
+    }),
 }
 
 // Same limits the backend enforces; used to warn before uploading.

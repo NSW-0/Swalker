@@ -520,6 +520,54 @@ h3 {
   margin-right: 8px;
 }
 
+/* A case file's clips (the dialog is outside the page wrapper, so these aren't scoped). */
+.archive-clips {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.archive-clip {
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
+.archive-clip .archive-vector-box {
+  padding: 10px 12px;
+}
+
+.archive-clip-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+  margin-bottom: 6px;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.archive-clip-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.archive-clip-title b {
+  color: var(--text);
+}
+
+.archive-clip-date {
+  font-size: 12px;
+}
+
+.archive-clip-confirm {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  color: var(--accent);
+}
+
 .page-about-content {
   display: flex;
   flex-direction: column;
@@ -1368,6 +1416,17 @@ h3 {
   height: 11px;
   background: var(--text-h);
   opacity: 0.6;
+}
+
+/* Which of the person's clips matched, when they have several. */
+.page-verdict-content .suspect-card-clip {
+  margin: 0;
+  max-width: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+  color: var(--muted);
 }
 
 .page-verdict-content .suspect-card-dist {

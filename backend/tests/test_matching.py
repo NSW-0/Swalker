@@ -30,3 +30,15 @@ def test_is_match_uses_distance_not_confidence():
     assert not is_match(far, threshold=30)
     assert is_match(far, threshold=50)  # the boundary counts as a match
     assert not is_match([], threshold=30)
+
+
+def test_groups_count_each_person_once_with_their_closest_clip():
+    # Rows 0 and 2 are person 0, rows 1 and 3 person 1, row 4 person 2.
+    features = np.array([[9.0, 0], [2.0, 0], [1.0, 0], [3.0, 0], [5.0, 0]], np.float32)
+    suspects = rank(np.zeros(2, np.float32), features, top_k=3, groups=[0, 1, 0, 1, 2])
+    assert [(s.index, s.row) for s in suspects] == [(0, 2), (1, 1), (2, 4)]
+    assert [s.distance for s in suspects] == pytest.approx([1.0, 2.0, 5.0])
+    assert sum(s.confidence for s in suspects) == pytest.approx(100)
+    # Fewer people than top_k: everyone once.
+    two = rank(np.zeros(2, np.float32), features[:4], top_k=3, groups=[0, 1, 0, 1])
+    assert [s.index for s in two] == [0, 1]
