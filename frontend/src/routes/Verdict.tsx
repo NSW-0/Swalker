@@ -14,14 +14,26 @@ import InvestigationLoader from '../components/verdict/InvestigationLoader'
 import DistanceScale from '../components/verdict/DistanceScale'
 import WalkPlayer, { EmptyCaseFile } from '../components/verdict/WalkPlayer'
 import { SilhouetteThumb } from '../components/verdict/Silhouettes'
-import { api, ApiError, FEATURE_DIM, scalePosition } from '../api/client'
+import { api, ApiError, FEATURE_DIM, scaleEnd, scalePosition } from '../api/client'
 import type { JobStatus, Suspect, VerdictResult } from '../api/client'
 import { getClue, investigateClue } from '../data/clueStore'
 import duckGem from '../assets/duckGem.png'
 // Web-sized copy: duckNoGem.png is 6.5 MB.
 import duckNoGem from '../assets/duckNoGem_web.webp'
 
-function SuspectCard({ suspect, rank, threshold, isPrime }: { suspect: Suspect; rank: number; threshold: number; isPrime: boolean }) {
+function SuspectCard({
+  suspect,
+  rank,
+  threshold,
+  end,
+  isPrime,
+}: {
+  suspect: Suspect
+  rank: number
+  threshold: number
+  end: number
+  isPrime: boolean
+}) {
   const inside = suspect.distance <= threshold
   return (
     <div className={isPrime ? 'suspect-card suspect-card-prime' : 'suspect-card'}>
@@ -37,8 +49,8 @@ function SuspectCard({ suspect, rank, threshold, isPrime }: { suspect: Suspect; 
           {suspect.personId}
         </p>
         <div className="suspect-card-bar" aria-hidden="true">
-          <span className={inside ? 'is-inside' : ''} style={{ width: `${(1 - scalePosition(suspect.distance, threshold)) * 100}%` }} />
-          <i />
+          <span className={inside ? 'is-inside' : ''} style={{ width: `${(1 - scalePosition(suspect.distance, end)) * 100}%` }} />
+          <i style={{ left: `${(1 - scalePosition(threshold, end)) * 100}%` }} />
         </div>
         <p className="suspect-card-dist">
           distance <b>{suspect.distance.toFixed(1)}</b>
@@ -139,6 +151,7 @@ export default function Verdict() {
   const best = verdict?.suspects[0]
   const clipName = verdict?.clipName ?? clue.name
   const matched = verdict?.isMatch === true && best !== undefined
+  const end = verdict ? scaleEnd(verdict.threshold, verdict.suspects.map((s) => s.distance)) : 1
 
   return (
     <section className="page page-verdict-content">
@@ -227,7 +240,7 @@ export default function Verdict() {
 
               <p className="verdict-sentence">{verdictSentence(verdict, best)}</p>
 
-              {best && <DistanceScale distance={best.distance} threshold={verdict.threshold} isMatch={matched} />}
+              {best && <DistanceScale distance={best.distance} threshold={verdict.threshold} end={end} isMatch={matched} />}
 
               {best && (
                 <dl className="verdict-facts">
@@ -291,7 +304,14 @@ export default function Verdict() {
                 </h2>
                 <div className="verdict-lineup">
                   {verdict.suspects.map((s, i) => (
-                    <SuspectCard key={s.personId} suspect={s} rank={i + 1} threshold={verdict.threshold} isPrime={matched && i === 0} />
+                    <SuspectCard
+                      key={s.personId}
+                      suspect={s}
+                      rank={i + 1}
+                      threshold={verdict.threshold}
+                      end={end}
+                      isPrime={matched && i === 0}
+                    />
                   ))}
                 </div>
               </section>

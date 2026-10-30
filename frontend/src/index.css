@@ -1056,12 +1056,21 @@ h3 {
 }
 
 .page-verdict-content .distance-scale-labels {
+  position: relative;
   display: flex;
   justify-content: space-between;
   margin-top: 14px;
   font-size: 12px;
   font-weight: 700;
   color: #85838a;
+}
+
+/* The match line's label sits under the wing, wherever the line falls on the scale. */
+.page-verdict-content .distance-scale-labels span:nth-child(2) {
+  position: absolute;
+  top: 0;
+  transform: translateX(-50%);
+  white-space: nowrap;
 }
 
 .page-verdict-content .verdict-facts {
