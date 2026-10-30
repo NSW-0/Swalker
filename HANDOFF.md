@@ -309,6 +309,9 @@ backend/
 | POST | `/api/identify` | Crime Scene → Verdict | Upload a video (multipart). Returns the `VerdictResult` shape above **plus** `queryId`, `threshold`, `querySilhouettes` (≈10 frames as PNG URLs or data URLs) and, for each suspect, a thumbnail URL. Keeps the query's 4096-d vector server-side under `queryId` for a while |
 | POST | `/api/gallery` | Verdict "Add to the Archive" | `{ name, queryId }` → saves that walker as a new case file without re-uploading. 409 if the name exists |
 | POST | `/api/gallery/from-video` | Archive "Add Case File" | Upload a video + name → new case file |
+| POST | `/api/gallery/{personId}/clips` | Verdict "Existing person" | `{ queryId }` → another clip of that person (built 2026-10-30) |
+| POST | `/api/gallery/{personId}/clips/from-video` | Archive "Add clip" | Upload a video → another clip of that person |
+| DELETE | `/api/gallery/{personId}/clips/{clipId}` | Archive case file | Remove one clip (not the last: delete the case file instead) |
 
 Errors the UI must be able to show: no person found in the video, too few usable frames, file too
 large / wrong type, model not loaded.

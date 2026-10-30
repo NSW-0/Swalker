@@ -5,7 +5,10 @@ import Dialog from '@mui/material/Dialog'
 import DialogTitle from '@mui/material/DialogTitle'
 import DialogContent from '@mui/material/DialogContent'
 import DialogActions from '@mui/material/DialogActions'
+import MenuItem from '@mui/material/MenuItem'
 import TextField from '@mui/material/TextField'
+import ToggleButton from '@mui/material/ToggleButton'
+import ToggleButtonGroup from '@mui/material/ToggleButtonGroup'
 import Tooltip from '@mui/material/Tooltip'
 import ArchiveOutlinedIcon from '@mui/icons-material/ArchiveOutlined'
 import CheckCircleOutlinedIcon from '@mui/icons-material/CheckCircleOutlined'
@@ -52,6 +55,11 @@ function SuspectCard({
           <span className={inside ? 'is-inside' : ''} style={{ width: `${(1 - scalePosition(suspect.distance, end)) * 100}%` }} />
           <i style={{ left: `${(1 - scalePosition(threshold, end)) * 100}%` }} />
         </div>
+        {suspect.clipCount > 1 && (
+          <p className="suspect-card-clip" title={`Closest of their ${suspect.clipCount} clips`}>
+            via {suspect.matchedClip}
+          </p>
+        )}
         <p className="suspect-card-dist">
           distance <b>{suspect.distance.toFixed(1)}</b>
           <span title="Relative between these suspects only, not a probability">
@@ -104,11 +112,16 @@ export default function Verdict() {
 
   // Saving an unknown walker to the Archive
   const [saveOpen, setSaveOpen] = useState(false)
+  const [saveMode, setSaveMode] = useState<'new' | 'existing'>('new')
+  const [people, setPeople] = useState<string[]>([])
+  const [existing, setExisting] = useState('')
+  const [addedTo, setAddedTo] = useState(false) // savedAs is an existing person
   const [newName, setNewName] = useState('')
   const [saveError, setSaveError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [savedAs, setSavedAs] = useState<string | null>(null)
   const trimmedName = newName.trim()
+  const canSave = saveMode === 'new' ? trimmedName !== '' : existing !== ''
 
   useEffect(() => {
     if (!clue) return
@@ -129,17 +142,27 @@ export default function Verdict() {
   const openSaveDialog = () => {
     if (!verdict) return
     setNewName(suggestedName(verdict.gallerySize))
+    setSaveMode('new')
+    setExisting(verdict.suspects[0]?.personId ?? '')
     setSaveError(null)
     setSaveOpen(true)
+    api
+      .gallery()
+      .then((g) => setPeople(g.entries.map((e) => e.personId)))
+      .catch(() => setPeople(verdict.suspects.map((s) => s.personId)))
   }
 
   const handleSave = async () => {
-    if (!verdict || trimmedName === '' || saving) return
+    if (!verdict || !canSave || saving) return
     setSaving(true)
     setSaveError(null)
     try {
-      const saved = await api.saveQuery(trimmedName, verdict.queryId)
+      const saved =
+        saveMode === 'new'
+          ? await api.saveQuery(trimmedName, verdict.queryId)
+          : await api.addClipFromQuery(existing, verdict.queryId)
       setSavedAs(saved.personId)
+      setAddedTo(saveMode === 'existing')
       setSaveOpen(false)
     } catch (e) {
       setSaveError(e instanceof ApiError ? e.message : 'Saving failed.')
@@ -266,7 +289,7 @@ export default function Verdict() {
                 {matched ? (
                   <WalkPlayer frames={best.silhouetteUrls} label="On file" title={best.personId} />
                 ) : savedAs ? (
-                  <WalkPlayer frames={verdict.querySilhouettes} label="New case file" title={savedAs} />
+                  <WalkPlayer frames={verdict.querySilhouettes} label={addedTo ? 'Added to case file' : 'New case file'} title={savedAs} />
                 ) : (
                   <EmptyCaseFile>
                     <p>
@@ -288,7 +311,15 @@ export default function Verdict() {
               {savedAs && (
                 <p className="verdict-saved">
                   <CheckCircleOutlinedIcon fontSize="small" />
-                  Saved to the Archive as <b>{savedAs}</b>
+                  {addedTo ? (
+                    <>
+                      Added to <b>{savedAs}</b>'s case file
+                    </>
+                  ) : (
+                    <>
+                      Saved to the Archive as <b>{savedAs}</b>
+                    </>
+                  )}
                   <Link to={`/archive?person=${encodeURIComponent(savedAs)}`}>See the case file →</Link>
                 </p>
               )}
@@ -368,23 +399,64 @@ export default function Verdict() {
         >
           <DialogTitle sx={{ fontWeight: 700 }}>Open a case file</DialogTitle>
           <DialogContent>
-            <p className="verdict-dialog-text">
-              Their gait signature from {clipName} is saved under this name. The video itself is not kept.
-            </p>
-            <TextField
-              autoFocus
+            <ToggleButtonGroup
+              exclusive
               fullWidth
-              label="Case file name"
-              value={newName}
-              onChange={(e) => {
-                setNewName(e.target.value)
+              size="small"
+              value={saveMode}
+              onChange={(_, value: 'new' | 'existing' | null) => {
+                if (value) setSaveMode(value)
                 setSaveError(null)
               }}
-              error={saveError !== null}
-              helperText={saveError ?? ' '}
-              slotProps={{ htmlInput: { maxLength: 40 } }}
-              sx={{ mt: 1 }}
-            />
+              sx={{ mb: 1.5 }}
+            >
+              <ToggleButton value="new">New person</ToggleButton>
+              <ToggleButton value="existing" disabled={people.length === 0}>
+                Existing person
+              </ToggleButton>
+            </ToggleButtonGroup>
+            <p className="verdict-dialog-text">
+              {saveMode === 'new'
+                ? `Their gait signature from ${clipName} is saved under this name.`
+                : `${clipName} becomes another clip of this person (say, with a bag or a coat), so walks like it are recognised next time.`}{' '}
+              The video itself is not kept.
+            </p>
+            {saveMode === 'new' ? (
+              <TextField
+                autoFocus
+                fullWidth
+                label="Case file name"
+                value={newName}
+                onChange={(e) => {
+                  setNewName(e.target.value)
+                  setSaveError(null)
+                }}
+                error={saveError !== null}
+                helperText={saveError ?? ' '}
+                slotProps={{ htmlInput: { maxLength: 40 } }}
+                sx={{ mt: 1 }}
+              />
+            ) : (
+              <TextField
+                select
+                fullWidth
+                label="Person"
+                value={people.includes(existing) ? existing : ''}
+                onChange={(e) => {
+                  setExisting(e.target.value)
+                  setSaveError(null)
+                }}
+                error={saveError !== null}
+                helperText={saveError ?? ' '}
+                sx={{ mt: 1 }}
+              >
+                {people.map((id) => (
+                  <MenuItem key={id} value={id}>
+                    {id}
+                  </MenuItem>
+                ))}
+              </TextField>
+            )}
           </DialogContent>
           <DialogActions sx={{ px: 3, pb: 2.5 }}>
             <Button onClick={() => setSaveOpen(false)} disabled={saving} sx={{ color: 'var(--muted)' }}>
@@ -393,7 +465,7 @@ export default function Verdict() {
             <Button
               type="submit"
               variant="contained"
-              disabled={trimmedName === '' || saving}
+              disabled={!canSave || saving}
               sx={{ borderRadius: '999px', px: 3 }}
             >
               {saving ? 'Saving…' : 'Save'}

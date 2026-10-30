@@ -30,10 +30,12 @@ the background behind each item, see `HANDOFF.md`. For running the backend, see 
     phone clip isn't fed as slow motion. The Archive records the frame rate, so Archives built
     before this change are flagged incompatible.
   - Reading stops after 450 frames, so long uploads can't take minutes.
-- **Matching:** Euclidean distance, top 3, and a match threshold, so strangers come out as
-  "Unknown" (§6.3). Raw distances are always returned. "Strength" is labelled as relative only (§6.4).
-- **Archive storage** (`backend/storage/gallery/`, git-ignored): per person, a 4096-d vector, ~10
-  small silhouette PNGs and metadata. **Videos are never stored**: uploads are deleted after
+- **Matching:** Euclidean distance, top 3 people, and a match threshold, so strangers come out as
+  "Unknown" (§6.3). A person can have several clips (e.g. normal, with a bag, in a coat); every
+  clip is compared and each person counts once, with their closest clip. Raw distances are always returned. "Strength" is labelled as relative only (§6.4).
+- **Archive storage** (`backend/storage/gallery/`, git-ignored): per person one or more clips, each
+  a 4096-d vector, ~10 small silhouette PNGs and metadata. Archives from before clips existed are
+  read as one clip per person. **Videos are never stored**: uploads are deleted after
   processing. The Archive records which preprocessing and checkpoint built it, and refuses to
   match if those change.
 - **API:**
@@ -45,11 +47,16 @@ the background behind each item, see `HANDOFF.md`. For running the backend, see 
     searching | done | error` with overall progress, and the result when done (HANDOFF §7.3)
   - `POST /api/gallery` (save a walker by `queryId`, no re-upload)
   - `POST /api/gallery/from-video`
+  - `POST /api/gallery/{id}/clips` (another clip by `queryId`),
+    `POST /api/gallery/{id}/clips/from-video`, `DELETE /api/gallery/{id}/clips/{clipId}`
+    (not the last clip)
 
   Errors the UI can show: no person, too few frames, wrong type, too large, model not loaded,
   name taken, expired query.
-- **Archive editing:** `PATCH /api/gallery/{id}` renames (the vector and silhouettes stay),
-  `DELETE /api/gallery/{id}` removes the vector, the entry and its silhouettes.
+- **Archive editing:** `PATCH /api/gallery/{id}` renames (the vectors and silhouettes stay),
+  `DELETE /api/gallery/{id}` removes the person with all their clips. In the UI: "Add Case File"
+  chooses New person / Existing person, a case file lists its clips (remove each, "Add clip"),
+  and the Verdict page can save a walk as another clip of someone on file.
 - **Scripts:**
   - `casia_eval`, for Kaggle: first checks that `train` mode reproduces the known baseline
     (NM 99.27 / BG 93.26 / CL 72.36) and marks the threshold untrusted if not; then Rank-1 for each
@@ -111,8 +118,9 @@ the background behind each item, see `HANDOFF.md`. For running the backend, see 
 - **The site is wider than a phone screen** (every page measures 454 px wide on a 390 px phone).
   This comes from the shared layout (96 px nav rail plus page widths), not one page, so it needs
   a mobile pass on the shell.
-- Several clips of one person aren't averaged yet: each case file holds one clip's vector.
-  Averaging may help (HANDOFF §7.5).
+- Several clips per person are matched by the closest one, not averaged. How much extra clips
+  help on real video is not measured yet: it needs a second bag (or coat) clip of the same person
+  that isn't in the Archive.
 - The Archive is a single process's files. Run one backend instance, not several.
 - `backend/app/ml/combined_glfe_mstfe.py` must not be edited. A new architecture comes with its
   own checkpoint: replace both together.

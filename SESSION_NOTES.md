@@ -86,8 +86,13 @@ masks; YOLO's mask quality on real video is **not** measured by them.
 3. The framing question (HANDOFF §6.1) is closed unless real recordings show a problem. Any
    further `casia_eval` experiment: add a mode to `MODES` and put it in `DEFAULT_MODES` with
    `train` (needed for the baseline check); a run is ~10 min per mode.
-4. **Not started:** averaging several clips per person (HANDOFF §7.5), and the phone-width
-   layout (every page is 454 px wide on a 390 px phone; the shared shell, not one page).
+4. **Several clips per person: built** on `nSawafta/multi-clip` (2026-10-30). index.json version 2
+   (`people[].clips[]`, one features row per clip; version 1 is read as one clip each and
+   rewritten on the next change). Matching: closest clip per person (`matching.rank(groups=)`).
+   Checked end to end with the real models on a copy of the Archive. **Not measured yet:**
+   whether it helps on real video; needs a second bag clip of someone whose first bag clip is in
+   the Archive. **Not started:** the phone-width layout (every page is 454 px wide on a 390 px
+   phone; the shared shell, not one page).
 5. **Real recordings** (needs the team): record clips, run `scripts/calibrate_threshold`, build
    the Archive (`PROJECT_STATUS.md` → "Left to do").
 
