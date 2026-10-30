@@ -160,3 +160,13 @@ def test_rename_and_delete_case_files(client):
     # The renamed walker is still recognised under the new name.
     again = result(client, b"k")
     assert again["isMatch"] and again["suspects"][0]["personId"] == "Kareem Hamza"
+
+
+def test_from_video_without_a_name_uses_the_clip_name(client):
+    res = client.post("/api/gallery/from-video", files=video(b"h", "hamed_bag (1).mp4"))
+    assert res.status_code == 201 and res.json()["personId"] == "hamed_bag 1"
+    res = client.post("/api/gallery/from-video", data={"name": "  "}, files=video(b"n", "Nabeel.mp4"))
+    assert res.status_code == 201 and res.json()["personId"] == "Nabeel"
+    # Same clip name again: taken, like a typed name.
+    res = client.post("/api/gallery/from-video", files=video(b"n2", "nabeel.MP4"))
+    assert res.status_code == 409 and res.json()["error"] == "name_taken"

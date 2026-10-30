@@ -129,3 +129,13 @@ def test_old_archives_without_a_frame_rate_are_incompatible(tmp_path):
     assert not GalleryStore(
         tmp_path, GalleryMeta(preprocess_mode="casia", checkpoint="a.pth", target_fps=25)
     ).compatible
+
+
+def test_name_from_filename():
+    from app.gallery.store import name_from_filename
+
+    assert name_from_filename("hamed_bag.mp4") == "hamed_bag"
+    assert name_from_filename("IMG (2)+final.MOV") == "IMG 2 final"
+    assert name_from_filename("نبيل.mp4") == "نبيل"
+    assert name_from_filename("((().mp4") == ""
+    assert len(name_from_filename("x" * 80 + ".mp4")) == 40

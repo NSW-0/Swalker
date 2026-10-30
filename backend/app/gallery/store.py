@@ -58,6 +58,13 @@ def validate_name(raw: str) -> str:
     return name
 
 
+def name_from_filename(filename: str) -> str:
+    """A case file name from an upload's file name, for when none was typed: "hamed_bag (1).mp4"
+    -> "hamed_bag 1". Characters names can't have become spaces; may be empty."""
+    stem = Path(filename).stem
+    return " ".join(re.sub(r"[^\w .'\-]+", " ", stem).split())[:NAME_MAX].strip()
+
+
 def _slugify(name: str) -> str:
     ascii_name = unicodedata.normalize("NFKD", name).encode("ascii", "ignore").decode()
     return re.sub(r"[^a-z0-9]+", "_", ascii_name.lower()).strip("_")[:30] or "person"
