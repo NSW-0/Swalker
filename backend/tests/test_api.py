@@ -170,3 +170,44 @@ def test_from_video_without_a_name_uses_the_clip_name(client):
     # Same clip name again: taken, like a typed name.
     res = client.post("/api/gallery/from-video", files=video(b"n2", "nabeel.MP4"))
     assert res.status_code == 409 and res.json()["error"] == "name_taken"
+
+
+def test_several_clips_per_person(client):
+    client.post("/api/gallery/from-video", data={"name": "Hamed"}, files=video(b"hamed-normal", "hamed.mp4"))
+    client.post("/api/gallery/from-video", data={"name": "Raid"}, files=video(b"raid", "raid.mp4"))
+
+    # A bag clip of Hamed came out unknown; it's added to his case file from the Verdict page.
+    bag = result(client, b"hamed-bag", "hamed_bag.mp4")
+    added = client.post("/api/gallery/Hamed/clips", json={"queryId": bag["queryId"]})
+    assert added.status_code == 201
+    assert added.json()["clipCount"] == 2
+    assert [c["videoPath"] for c in added.json()["clips"]] == ["hamed.mp4", "hamed_bag.mp4"]
+    assert all(len(c["silhouetteUrls"]) == 10 for c in added.json()["clips"])
+    used = client.post("/api/gallery/Hamed/clips", json={"queryId": bag["queryId"]})
+    assert used.status_code == 404 and used.json()["error"] == "query_expired"
+
+    # A coat clip, uploaded straight into the Archive.
+    coat = client.post("/api/gallery/Hamed/clips/from-video", files=video(b"hamed-coat", "hamed_coat.mp4"))
+    assert coat.status_code == 201 and coat.json()["clipCount"] == 3
+    listed = {e["personId"]: e["clipCount"] for e in client.get("/api/gallery").json()["entries"]}
+    assert listed == {"Hamed": 3, "Raid": 1}
+    assert client.get("/api/health").json()["gallerySize"] == 2  # people, not clips
+
+    # Another bag walk matches his bag clip, and Hamed is listed once.
+    again = result(client, b"hamed-bag", "hamed_bag2.mp4")
+    assert again["isMatch"] and again["suspects"][0]["personId"] == "Hamed"
+    assert again["suspects"][0]["distance"] == 0.0
+    assert again["suspects"][0]["matchedClip"] == "hamed_bag.mp4"
+    assert again["suspects"][0]["clipCount"] == 3
+    assert [s["personId"] for s in again["suspects"]] == ["Hamed", "Raid"]
+
+    # Removing a clip; the last one can't go this way.
+    clips = coat.json()["clips"]
+    after = client.delete(f"/api/gallery/Hamed/clips/{clips[1]['clipId']}")
+    assert after.status_code == 200 and after.json()["clipCount"] == 2
+    client.delete(f"/api/gallery/Hamed/clips/{clips[2]['clipId']}")
+    last = client.delete(f"/api/gallery/Hamed/clips/{clips[0]['clipId']}")
+    assert last.status_code == 409 and last.json()["error"] == "last_clip"
+
+    missing = client.post("/api/gallery/Nobody/clips/from-video", files=video(b"x"))
+    assert missing.status_code == 404

@@ -41,8 +41,13 @@ def main() -> None:
     features = np.asarray(data["features"], np.float32)
     for person_id, vector, video in zip(data["person_ids"], features, data["video_paths"], strict=True):
         try:
-            store.add(str(person_id), str(video), vector, silhouettes=[])
-            print(f"added {person_id}")
+            # A name seen before is another clip of the same person.
+            if store.find(str(person_id)) is not None:
+                store.add_clip(str(person_id), str(video), vector, silhouettes=[])
+                print(f"added a clip to {person_id}")
+            else:
+                store.add(str(person_id), str(video), vector, silhouettes=[])
+                print(f"added {person_id}")
         except ApiError as exc:
             print(f"skip {person_id}: {exc.message}")
     print(f"Archive now has {len(store)} case files ({meta})")

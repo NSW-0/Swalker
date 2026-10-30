@@ -10,6 +10,7 @@ from app.api.serialize import png_data_url, silhouette_urls, thumbnail_url
 from app.api.uploads import save_upload
 from app.errors import ApiError
 from app.gallery.matching import is_match, rank
+from app.gallery.store import row_owners
 from app.ml.pipeline import WalkAnalysis
 from app.queries import CachedQuery
 from app.state import AppState, get_state
@@ -56,8 +57,10 @@ def run_identify(state: AppState, job_id: str, path: Path, clip_name: str) -> No
 
 def verdict(state: AppState, walk: WalkAnalysis, clip_name: str) -> dict:
     settings = state.settings
-    entries, features = state.store.snapshot()
-    suspects = rank(walk.vector, features, settings.top_k)
+    people, features = state.store.snapshot()
+    owners = row_owners(people)
+    # Every clip is compared; each person counts once, with their closest clip.
+    suspects = rank(walk.vector, features, settings.top_k, groups=[p for p, _ in owners])
     query_id = state.queries.put(CachedQuery(vector=walk.vector, display=walk.display, clip_name=clip_name))
     return {
         "caseId": f"{int(query_id[:8], 16) % 10000:04d}",
@@ -66,19 +69,24 @@ def verdict(state: AppState, walk: WalkAnalysis, clip_name: str) -> dict:
         "framesTotal": walk.frames_total,
         "framesWithPerson": walk.frames_with_person,
         "framesUsed": walk.frames_used,
-        "gallerySize": len(entries),
+        "gallerySize": len(people),
         "threshold": settings.match_threshold,
         "thresholdCalibrated": settings.threshold_calibrated,
         "isMatch": is_match(suspects, settings.match_threshold),
-        "suspects": [
-            {
-                "personId": entries[s.index].personId,
-                "distance": s.distance,
-                "confidence": s.confidence,
-                "thumbnailUrl": thumbnail_url(entries[s.index]),
-                "silhouetteUrls": silhouette_urls(entries[s.index]),
-            }
-            for s in suspects
-        ],
+        "suspects": [suspect(people, owners, s) for s in suspects],
         "querySilhouettes": [png_data_url(s) for s in walk.display],
+    }
+
+
+def suspect(people, owners, s) -> dict:
+    person = people[s.index]
+    clip = person.clips[owners[s.row][1]]
+    return {
+        "personId": person.personId,
+        "distance": s.distance,
+        "confidence": s.confidence,
+        "clipCount": len(person.clips),
+        "matchedClip": clip.videoPath,  # which of their clips was closest
+        "thumbnailUrl": thumbnail_url(clip),
+        "silhouetteUrls": silhouette_urls(clip),
     }
