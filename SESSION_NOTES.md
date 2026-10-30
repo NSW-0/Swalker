@@ -6,10 +6,9 @@ Update this file at the end of each session.
 
 ## Current state
 
-- **`main`** has everything up to PR #20 (several clips per person). The full list of changes is
-  in `CHANGELOG.md`; keep it updated with every change.
-- **Branch `nSawafta/add-clip-for-person`** (PR not merged as of 2026-10-30): "Add clip" inside a
-  case file adds to that person without asking New / Existing.
+- **`main`** has everything up to PR #21 (several clips per person, "Add clip" inside a case file
+  adds to that person). The full list of changes is in `CHANGELOG.md`; keep it updated with every
+  change. Before writing "not merged", check `git log origin/main`: the user often merges quickly.
 - The Archive on the user's machine has 10 people, one clip each (`index.json` still version 1
   until the next change; it's read fine).
 - **Backend checks:** 81 pytest tests pass and ruff is clean. Run them from `backend/` with

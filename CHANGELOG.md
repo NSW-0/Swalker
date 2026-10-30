@@ -5,11 +5,13 @@ Measurements are given with what they were measured on. Add an entry with every 
 
 ## Not merged yet
 
-- **Add clip from a case file goes straight to that person**: no New / Existing choice or person
-  picker when "Add clip" is pressed inside a case file. Branch `nSawafta/add-clip-for-person`.
+- **Changelog** (this file) and the rule in CLAUDE.md to keep it updated. Branch
+  `nSawafta/changelog`.
 
 ## 2026-10-30
 
+- **Add clip from a case file goes straight to that person** (#21): no New / Existing choice or
+  person picker when "Add clip" is pressed inside a case file.
 - **Several clips per person in the Archive** (#20). A person can have a normal clip, a bag clip,
   a coat clip…; every clip is compared and each person counts once, by their closest clip. Add
   Case File chooses New / Existing person; a case file lists its clips (remove, "Add clip"); the
