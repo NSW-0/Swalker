@@ -9,6 +9,10 @@ frontend expects, and known problems in the inference scripts. Then read `SESSIO
 where the last session stopped, the next steps, and lessons learned. Update it before a session
 ends.
 
+**Keep `CHANGELOG.md` up to date:** every change gets a dated line there, in the same branch as
+the change (under "Not merged yet" until its PR is merged, then under the merge date with the PR
+number). The user wants all changes tracked.
+
 ## Commands
 
 Frontend (`frontend/`):
