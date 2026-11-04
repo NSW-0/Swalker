@@ -5,8 +5,15 @@ Measurements are given with what they were measured on. Add an entry with every 
 
 ## Not merged yet
 
-- **Changelog** (this file) and the rule in CLAUDE.md to keep it updated. Branch
-  `nSawafta/changelog`.
+- **Raw CASIA-B videos into the Archive** (`scripts/casia_videos.py`): vectors for all 110 walks of
+  each of the 124 people through the real YOLO pipeline (resumable cache), an Archive of
+  "Person 001".."Person 124" without bg-02 and cl-02, those held-out videos copied for testing,
+  and a report that keeps people from training (001-074) apart from new people (075-124). Case
+  file silhouettes load lazily. Branch `nSawafta/casia-archive`.
+
+## 2026-10-30
+
+- **Changelog** (this file) and the rule in CLAUDE.md to keep it updated (#22).
 
 ## 2026-10-30
 

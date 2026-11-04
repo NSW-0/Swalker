@@ -78,6 +78,7 @@ Run them from `backend/` with the venv active.
 |---|---|
 | `python -m scripts.embed_video clip.mp4 --save-silhouettes out\` | embeds a clip twice: shape, norm, identical? |
 | `python -m scripts.casia_eval --root <CASIA-B> --checkpoint <pth>` | on Kaggle: Rank-1 for each preprocessing against the training-side framing (HANDOFF §6.1) plus genuine/impostor distances and a threshold table. Instructions at the top of the script |
+| `python -m scripts.casia_videos embed --root <datasets>`, then `evaluate`, then `build --root <datasets>` | raw CASIA-B videos into the Archive with bg-02 and cl-02 held out for testing, and the measurements. Instructions at the top of the script |
 | `python -m scripts.calibrate_threshold videos\` | `videos\<person>\*.mp4`, at least 2 people × 2 clips. Prints genuine/impostor distances and the threshold at several false-match rates |
 | `python -m scripts.import_gallery_pkl gallery.pkl --preprocess-mode crop` | imports an old `gallery.pkl` |
 

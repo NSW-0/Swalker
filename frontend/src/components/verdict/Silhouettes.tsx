@@ -11,8 +11,9 @@ export function SilhouetteStrip({ frames, className = 'verdict-strip' }: { frame
   }
   return (
     <div className={className}>
+      {/* Lazy: a case file can list dozens of clips of 10 frames each. */}
       {frames.map((src, i) => (
-        <img key={i} className="sil-img" src={src} alt={i === 0 ? 'Walking silhouette frames' : ''} />
+        <img key={i} className="sil-img" loading="lazy" src={src} alt={i === 0 ? 'Walking silhouette frames' : ''} />
       ))}
     </div>
   )

@@ -218,6 +218,14 @@ class GalleryStore:
             raise ValueError(f"vector must be ({self.meta.feature_dim},), got {vector.shape}")
         return vector
 
+    def _free_slug(self, name: str) -> str:
+        slug = _slugify(name)
+        used = {p.slug for p in self.people}
+        base, n = slug, 2
+        while slug in used or (self.sil_dir / slug).exists():
+            slug, n = f"{base}_{n}", n + 1
+        return slug
+
     def _write_clip(self, slug: str, video_name: str, silhouettes: list[np.ndarray]) -> Clip:
         clip_id = uuid.uuid4().hex[:8]
         clip_dir = self.sil_dir / slug / clip_id
@@ -239,12 +247,7 @@ class GalleryStore:
             if self.name_taken(name):
                 raise ApiError("name_taken", f"A case file named '{name}' already exists.", 409)
 
-            slug = _slugify(name)
-            used = {p.slug for p in self.people}
-            base, n = slug, 2
-            while slug in used or (self.sil_dir / slug).exists():
-                slug, n = f"{base}_{n}", n + 1
-
+            slug = self._free_slug(name)
             clip = self._write_clip(slug, video_name, silhouettes)
             person = Person(personId=name, slug=slug, addedAt=clip.addedAt, clips=[clip])
             people = [*self.people, person]
@@ -252,6 +255,31 @@ class GalleryStore:
             self._persist(people, features)
             self.people, self.features = people, features
             return person
+
+    def add_many(self, name: str, clips: list[tuple], persist: bool = True) -> Person:
+        """A new person with all their clips, (video name, vector, silhouettes) each. For bulk imports:
+        add() and add_clip() rewrite features.npy every time. With persist=False call save() at the end."""
+        name = validate_name(name)
+        if not clips:
+            raise ValueError("a person needs at least one clip")
+        vectors = np.stack([self._check_vector(vector) for _, vector, _ in clips])
+        with self._lock:
+            self.require_compatible()
+            if self.name_taken(name):
+                raise ApiError("name_taken", f"A case file named '{name}' already exists.", 409)
+            slug = self._free_slug(name)
+            written = [self._write_clip(slug, video, sils) for video, _, sils in clips]
+            person = Person(personId=name, slug=slug, addedAt=written[0].addedAt, clips=written)
+            people = [*self.people, person]
+            features = np.vstack([self.features, vectors])
+            if persist:
+                self._persist(people, features)
+            self.people, self.features = people, features
+            return person
+
+    def save(self) -> None:
+        with self._lock:
+            self._persist(self.people, self.features)
 
     def add_clip(self, person_id: str, video_name: str, vector: np.ndarray, silhouettes: list[np.ndarray]) -> Person:
         """Another clip of someone already in the Archive (e.g. carrying a bag, another day)."""

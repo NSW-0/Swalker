@@ -1,17 +1,27 @@
 # Session notes: where the last Claude Code session stopped
 
-Last updated 2026-10-30. Read this after `HANDOFF.md`. It covers work in progress, the next
+Last updated 2026-11-04. Read this after `HANDOFF.md`. It covers work in progress, the next
 steps, and things learned the hard way. For what is built overall, see `PROJECT_STATUS.md`.
 Update this file at the end of each session.
 
 ## Current state
 
-- **`main`** has everything up to PR #21 (several clips per person, "Add clip" inside a case file
-  adds to that person). The full list of changes is in `CHANGELOG.md`; keep it updated with every
-  change. Before writing "not merged", check `git log origin/main`: the user often merges quickly.
-- The Archive on the user's machine has 10 people, one clip each (`index.json` still version 1
-  until the next change; it's read fine).
-- **Backend checks:** 81 pytest tests pass and ruff is clean. Run them from `backend/` with
+- **`main`** has everything up to PR #22. All changes are listed in `CHANGELOG.md`; keep it updated.
+  Before writing "not merged", check `git log origin/main`: the user often merges quickly.
+- **Branch `nSawafta/casia-archive`** (PR not merged as of 2026-11-04): `scripts/casia_videos.py`.
+- **Raw CASIA-B videos** are in `C:\Users\nabee\Desktop\datasets\DatasetB-{1,2}\DatasetB-{1,2}\video\`:
+  124 people (B-1 has 001-062, B-2 has 063-124), 121 `.avi` each: 110 walks + 11 empty `bkgrd`.
+- **Long run started 2026-11-04** in its own PowerShell window (`embed`, then `evaluate`, then
+  `build`), logging to `backend/storage/casia_run.log`: about 5.2 hours at 1.41 s/clip, resumable by
+  running the same `embed` again (`backend/storage/casia_cache/<person>.npz`).
+  When it has finished, read the log and the results (`backend/storage/casia_videos_results.json`),
+  then set the match line from its threshold table. `build` refuses while the backend is running;
+  if so, close the backend and run `python -m scripts.casia_videos build --root <datasets>`.
+  It moves the old Archive to `backend/storage/gallery_before_casia_<date>` (kept, not deleted).
+- **Expect 8.5 to be wrong for this Archive:** a stranger is now compared with ~88 clips of each of
+  123 people, so their nearest distance is smaller than the same-view pair numbers 8.5 came from.
+  Only the new people (075-124) count for accuracy claims: 001-074 were in the training set.
+- **Backend checks:** 86 pytest tests pass and ruff is clean. Run them from `backend/` with
   `.venv\Scripts\python -m pytest` and `.venv\Scripts\python -m ruff check .`. The system Python
   has no ruff.
 
