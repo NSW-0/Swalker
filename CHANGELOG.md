@@ -6,10 +6,12 @@ Measurements are given with what they were measured on. Add an entry with every 
 ## Not merged yet
 
 - **Raw CASIA-B videos into the Archive** (`scripts/casia_videos.py`): vectors for all 110 walks of
-  each of the 124 people through the real YOLO pipeline (resumable cache), an Archive of
-  "Person 001".."Person 124" without bg-02 and cl-02, those held-out videos copied for testing,
-  and a report that keeps people from training (001-074) apart from new people (075-124). Case
-  file silhouettes load lazily. Branch `nSawafta/casia-archive`.
+  each of the 124 people through the real YOLO pipeline (resumable cache), an Archive with a first
+  name per person (001 = Ahmad, 002 = Omar) and half of the bag and coat recordings, the other half
+  (bg-02, cl-02) copied to `datasets/tests`, a report of what the dataset holds per person
+  (`datasets/dataset_report.md`), and measurements that keep people from training (001-074) apart
+  from new people (075-124). The old Archive goes to the Recycle Bin. Case file silhouettes load
+  lazily. Branch `nSawafta/casia-archive`.
 
 ## 2026-10-30
 

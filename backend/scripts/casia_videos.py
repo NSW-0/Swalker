@@ -7,6 +7,7 @@ have nobody in them and are skipped. Three steps, run from backend/:
     python -m scripts.casia_videos embed --root C:\\Users\\nabee\\Desktop\\datasets
     python -m scripts.casia_videos evaluate
     python -m scripts.casia_videos build --root C:\\Users\\nabee\\Desktop\\datasets
+    python -m scripts.casia_videos report --root C:\\Users\\nabee\\Desktop\\datasets
 
 embed     computes every clip's vector and display silhouettes into --cache, one file per person:
           ~1.25 s a clip on a GPU, ~4.7 hours for everyone. Run it again and it carries on where
@@ -16,21 +17,26 @@ evaluate  measures from the cache, and only reads it. Same person: Rank-1 for th
           its own person taken out of the Archive, which is what someone unknown looks like.
           People 001-074 were in the model's training set and 075-124 were not, so they are
           reported apart; only the second group's numbers say how well it recognises new people.
-build     makes the Archive from the cache: "Person 001".. with every clip except the held-out
-          recordings (bg-02 and cl-02, all angles), and copies those videos to --test-dir to try
-          on the website. The previous Archive is moved aside, not deleted. The backend must be
-          stopped, because it keeps the Archive in memory and would overwrite the new one.
+build     makes the Archive from the cache, each person under a first name (001 = Ahmad, 002 = Omar,
+          see NAMES), with every clip except the held-out half of the bag and coat recordings
+          (bg-02 and cl-02, all angles). Those videos are copied to <root>/tests/<name>/ to try on
+          the website. The previous Archive goes to the Recycle Bin. The backend must be stopped,
+          because it keeps the Archive in memory and would overwrite the new one. Also writes the report.
+report    lists what the dataset holds per person and where it went, in <root>/dataset_report.md
+          and .csv. Works before build too.
 """
 
 import argparse
+import csv
 import json
+import os
 import re
 import shutil
+import subprocess
 import time
 import urllib.error
 import urllib.request
 from dataclasses import dataclass
-from datetime import datetime
 from pathlib import Path
 
 import numpy as np
@@ -79,8 +85,21 @@ def find_videos(root: Path) -> dict[int, list[Video]]:
     return people
 
 
+# The name each CASIA-B person goes by in the Archive: NAMES[0] is 001. Made up, not who they are.
+NAMES = """
+Ahmad Omar Yousef Khaled Mahmoud Hassan Hussein Ali Samir Tariq Nasser Ziad Rami Sami Fadi Bassam
+Jamal Kamal Majed Hani Imad Issa Mousa Jawad Adnan Anas Amjad Ayman Bilal Basel Firas Ghassan Hazem
+Hatem Haitham Jihad Karim Laith Marwan Mazen Moath Muhannad Munther Nader Naim Nidal Osama Qais
+Ramzi Saeed Saleh Salim Shadi Sharif Suhail Talal Tamer Wael Wasim Yahya Yazan Zaher Zaid Zakaria
+Abdullah Abed Adel Akram Alaa Amer Amin Ashraf Aziz Baha Dawood Diaa Fahed Faris Fawzi Ghazi Habib
+Hamza Harun Ihab Jaber Jalal Luay Maher Mansour Nour Rashid Riad Sabri Safwan Samer Seif Sultan
+Taha Tawfiq Yaser Younis Zahi Ammar Anwar Hakim Hisham Khalil Labib Mohsen Murad Nasim Rabie Sufyan
+Adham Bakr Hadi Idris Ismail Lutfi Mamdouh Sameh Thaer Yamen Zuhair
+""".split()  # noqa: SIM905
+
+
 def person_name(subject: int) -> str:
-    return f"Person {subject:03d}"
+    return NAMES[subject - 1]
 
 
 def current_meta() -> dict:
@@ -347,6 +366,16 @@ def backend_is_running(port: int = 8000) -> bool:
     return True
 
 
+def to_recycle_bin(folder: Path) -> None:
+    """Windows only; recoverable until the bin is emptied."""
+    script = (
+        "Add-Type -AssemblyName Microsoft.VisualBasic; [Microsoft.VisualBasic.FileIO.FileSystem]::DeleteDirectory("
+        "$env:SWALKER_TRASH, 'OnlyErrorDialogs', 'SendToRecycleBin')"
+    )
+    env = {**os.environ, "SWALKER_TRASH": str(folder)}
+    subprocess.run(["powershell", "-NoProfile", "-NonInteractive", "-Command", script], env=env, check=True)
+
+
 def build(args) -> None:
     if backend_is_running():
         raise SystemExit("The backend is running: close it first, it would overwrite the new Archive.")
@@ -381,9 +410,8 @@ def build(args) -> None:
 
     gallery = settings.gallery_dir
     if gallery.exists():
-        aside = gallery.with_name(f"gallery_before_casia_{datetime.now():%Y%m%d_%H%M%S}")
-        gallery.rename(aside)
-        print(f"previous Archive moved to {aside}")
+        to_recycle_bin(gallery)
+        print(f"previous Archive sent to the Recycle Bin: {gallery}")
     building.rename(gallery)
     print(f"Archive: {len(paths)} people, {clips_added} clips, {len(store.features)} vectors")
 
@@ -399,6 +427,91 @@ def build(args) -> None:
                     shutil.copy2(video.path, folder / video.path.name)
                     copied += 1
         print(f"test clips: {copied} copied to {args.test_dir}")
+        write_report(args.root, args.cache)
+
+
+# ── report ────────────────────────────────────────────────────────────
+
+
+COLUMNS = {"nm": "normal", "bg": "bag", "cl": "coat"}
+
+
+def count_people(root: Path, cache: Path) -> list[dict]:
+    """Per person: videos of each kind in the dataset, and where the walks go."""
+    rows = []
+    background = {}
+    for path in root.rglob("*-bkgrd-*.avi"):
+        if path.parent.name.lower() == "video":
+            subject = int(path.name[:3])
+            background[subject] = background.get(subject, 0) + 1
+    for subject, videos in sorted(find_videos(root).items()):
+        path = cache_file(cache, subject)
+        failed = read_info(path)["failed"] if path.exists() else {}
+        row = {"number": f"{subject:03d}", "name": person_name(subject)}
+        for cond, label in COLUMNS.items():
+            of_cond = [v for v in videos if v.cond == cond]
+            kept = [v for v in of_cond if not v.held_out and v.path.name not in failed]
+            row[label] = len(of_cond)
+            row[f"{label} in Archive"] = len(kept)
+            row[f"{label} in tests"] = sum(v.held_out for v in of_cond)
+        row["empty background"] = background.get(subject, 0)
+        row["could not be read"] = len(failed)
+        rows.append(row)
+    return rows
+
+
+def write_report(root: Path, cache: Path) -> None:
+    rows = count_people(root, cache)
+    total = {key: sum(r[key] for r in rows) for key in rows[0] if key not in ("number", "name")}
+    with (root / "dataset_report.csv").open("w", newline="", encoding="utf-8-sig") as f:  # -sig: for Excel
+        writer = csv.DictWriter(f, fieldnames=list(rows[0]))
+        writer.writeheader()
+        writer.writerows(rows)
+
+    lines = [
+        "# CASIA-B dataset report",
+        "",
+        f"{len(rows)} people. File names read `001-bg-01-090.avi` = person 001, carrying a bag, recording 01,",
+        "camera angle 90 degrees (side view). Each recording is filmed from 11 angles: 000, 018, ... 180.",
+        "",
+        "## What the files are",
+        "",
+        "| Kind | In the file name | Recordings per person | Videos per person | Total | In the Archive | In tests |",
+        "|---|---|---|---|---|---|---|",
+    ]
+    recordings = {"nm": "01-06", "bg": "01-02", "cl": "01-02"}
+    for cond, label in COLUMNS.items():
+        per_person = sorted({r[label] for r in rows})
+        each = str(per_person[0]) if len(per_person) == 1 else f"{per_person[0]}-{per_person[-1]}"
+        lines.append(
+            f"| {label} walking | {cond} | {recordings[cond]} | {each} | {total[label]} "
+            f"| {total[f'{label} in Archive']} | {total[f'{label} in tests']} |"
+        )
+    lines += [
+        f"| empty background (nobody walking, not used) | bkgrd | - | 11 | {total['empty background']} | 0 | 0 |",
+        "",
+        "Half of the bag and coat videos are in the Archive (bg-01, cl-01), the other half in `tests` (bg-02, cl-02).",
+        f"Videos that could not be read (too little of the walker in view): {total['could not be read']}.",
+        "",
+        "The names are made up. They are not who these people are.",
+        "",
+        "## Per person",
+        "",
+        "| Number | Name | Normal | Bag | Coat | Archive: normal / bag / coat | tests: bag / coat | Unreadable |",
+        "|---|---|---|---|---|---|---|---|",
+    ]
+    for r in rows:
+        lines.append(
+            f"| {r['number']} | {r['name']} | {r['normal']} | {r['bag']} | {r['coat']} "
+            f"| {r['normal in Archive']} / {r['bag in Archive']} / {r['coat in Archive']} "
+            f"| {r['bag in tests']} / {r['coat in tests']} | {r['could not be read']} |"
+        )
+    (root / "dataset_report.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
+    print(f"report: {root / 'dataset_report.md'} and dataset_report.csv")
+
+
+def report(args) -> None:
+    write_report(args.root, args.cache)
 
 
 def main() -> None:
@@ -418,12 +531,16 @@ def main() -> None:
 
     step = steps.add_parser("build", help="make the Archive from the cache")
     step.add_argument("--root", type=Path, help="to also copy the held-out videos to --test-dir")
-    step.add_argument("--test-dir", type=Path, help="default: <root>/test_clips")
+    step.add_argument("--test-dir", type=Path, help="default: <root>/tests")
     step.set_defaults(run=build)
+
+    step = steps.add_parser("report", help="what the dataset holds, per person")
+    step.add_argument("--root", type=Path, required=True, help="folder holding the DatasetB-* folders")
+    step.set_defaults(run=report)
 
     args = parser.parse_args()
     if args.step == "build" and args.root and not args.test_dir:
-        args.test_dir = args.root / "test_clips"
+        args.test_dir = args.root / "tests"
     args.run(args)
 
 

@@ -5,9 +5,18 @@ import numpy as np
 import pytest
 
 from app.errors import ApiError
-from app.gallery.store import GalleryMeta, GalleryStore
+from app.gallery.store import GalleryMeta, GalleryStore, validate_name
 from app.ml.embed import FEATURE_DIM
-from scripts.casia_videos import evaluate_clips, find_videos, make_clips, nearest_per_person, parse_video, person_name
+from scripts.casia_videos import (
+    NAMES,
+    count_people,
+    evaluate_clips,
+    find_videos,
+    make_clips,
+    nearest_per_person,
+    parse_video,
+    person_name,
+)
 
 
 def test_parse_video_and_held_out_recordings():
@@ -17,7 +26,28 @@ def test_parse_video_and_held_out_recordings():
     assert not parse_video(Path("075-bg-01-090.avi")).held_out
     assert not parse_video(Path("075-nm-06-090.avi")).held_out
     assert parse_video(Path("075-bkgrd-090.avi")) is None
-    assert person_name(7) == "Person 007"
+
+
+def test_every_person_gets_their_own_valid_name():
+    assert person_name(1) == "Ahmad" and person_name(2) == "Omar"
+    names = [person_name(subject) for subject in range(1, 125)]
+    assert len({n.casefold() for n in names}) == 124
+    assert all(validate_name(n) == n for n in names)
+    # Not the names of the team, who were in the Archive before and would be confusing.
+    team = {"abdr", "hamed", "hodayfah", "ibrahim", "eyad", "mohamad", "mostafa", "nabeel", "raid"}
+    assert not team & {n.casefold() for n in NAMES}
+
+
+def test_count_people_says_where_each_kind_of_video_goes(tmp_path):
+    folder = tmp_path / "DatasetB-1" / "video"
+    folder.mkdir(parents=True)
+    for name in ["nm-01-090", "nm-06-090", "bg-01-090", "bg-02-090", "cl-01-090", "cl-02-090", "bkgrd-090"]:
+        (folder / f"002-{name}.avi").write_bytes(b"")
+    [row] = count_people(tmp_path, tmp_path / "no_cache_yet")
+    assert (row["number"], row["name"]) == ("002", "Omar")
+    assert (row["normal"], row["bag"], row["coat"], row["empty background"]) == (2, 2, 2, 1)
+    assert (row["normal in Archive"], row["bag in Archive"], row["coat in Archive"]) == (2, 1, 1)
+    assert (row["bag in tests"], row["coat in tests"], row["could not be read"]) == (1, 1, 0)
 
 
 def test_find_videos_only_reads_video_folders(tmp_path):

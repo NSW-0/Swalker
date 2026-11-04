@@ -17,11 +17,13 @@ Update this file at the end of each session.
   When it has finished, read the log and the results (`backend/storage/casia_videos_results.json`),
   then set the match line from its threshold table. `build` refuses while the backend is running;
   if so, close the backend and run `python -m scripts.casia_videos build --root <datasets>`.
-  It moves the old Archive to `backend/storage/gallery_before_casia_<date>` (kept, not deleted).
+  It sends the old Archive to the Recycle Bin, copies bg-02 and cl-02 to `datasets\tests\<name>\`
+  and writes `datasets\dataset_report.md` + `.csv`. Names: `NAMES` in the script (001 = Ahmad, 002 =
+  Omar). The log is UTF-16 (PowerShell Tee-Object): read it with PowerShell, not grep.
 - **Expect 8.5 to be wrong for this Archive:** a stranger is now compared with ~88 clips of each of
   123 people, so their nearest distance is smaller than the same-view pair numbers 8.5 came from.
   Only the new people (075-124) count for accuracy claims: 001-074 were in the training set.
-- **Backend checks:** 86 pytest tests pass and ruff is clean. Run them from `backend/` with
+- **Backend checks:** 88 pytest tests pass and ruff is clean. Run them from `backend/` with
   `.venv\Scripts\python -m pytest` and `.venv\Scripts\python -m ruff check .`. The system Python
   has no ruff.
 
