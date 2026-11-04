@@ -14,9 +14,6 @@ Measurements are given with what they were measured on. Add an entry with every 
 ## 2026-10-30
 
 - **Changelog** (this file) and the rule in CLAUDE.md to keep it updated (#22).
-
-## 2026-10-30
-
 - **Add clip from a case file goes straight to that person** (#21): no New / Existing choice or
   person picker when "Add clip" is pressed inside a case file.
 - **Several clips per person in the Archive** (#20). A person can have a normal clip, a bag clip,
