@@ -6,7 +6,7 @@ Update this file at the end of each session.
 
 ## Current state
 
-- **`main`** has everything up to PR #24. All changes are listed in `CHANGELOG.md`; keep it updated.
+- **`main`** has everything up to PR #25. All changes are listed in `CHANGELOG.md`; keep it updated.
   Before writing "not merged", check `git log origin/main`: the user often merges quickly.
 - **The user allows Claude Code to open and merge its own PRs** (2026-11-05). `gh` is installed and
   logged in as NSW-0. Put the PR number in the changelog before merging.
@@ -114,7 +114,7 @@ masks; YOLO's mask quality on real video is **not** measured by them.
    rewritten on the next change). Matching: closest clip per person (`matching.rank(groups=)`).
    Checked end to end with the real models on a copy of the Archive. **Not measured yet:**
    whether it helps on real video; needs a second bag clip of someone whose first bag clip is in
-   the Archive. The phone layout is done (`nSawafta/phone-layout`), checked in headless Edge but
+   the Archive. The phone layout is done (#25), checked in headless Edge but
    not yet on a real phone. To compare PC before and after a CSS change: drive headless Edge
    over its DevTools port (Node 24 has WebSocket, nothing to install) and save every element's box and
    styles per page and size. Ignore `.verdict-tag`: the case number is random, so its width changes.

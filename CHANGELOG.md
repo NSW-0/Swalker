@@ -3,16 +3,13 @@
 What changed in Swalker, newest first, one line per change with the PR that brought it to `main`.
 Measurements are given with what they were measured on. Add an entry with every PR (see CLAUDE.md).
 
-## Not merged yet
+## 2026-11-05
 
-- **Phone layout** (2026-11-05): navigation in a bar along the bottom, every page fits the width and
+- **Phone layout** (#25): navigation in a bar along the bottom, every page fits the width and
   scrolls inside, dialogs use more of the screen. Checked in headless Edge at 320, 360, 390 and 430 px
   wide, a phone on its side and a small tablet: nothing wider than the screen in 78 captures. All in one
   screen-size block in `index.css`. PC at 7 window sizes, 70 captures compared before and after: only the
-  random case number's tag moved, 40 of 35,812 element lines. Branch `nSawafta/phone-layout`.
-
-## 2026-11-05
-
+  random case number's tag moved, 40 of 35,812 element lines.
 - **Match line 8, was 7.2** (#24), the team's choice to accept more of the right people. New people,
   right person accepted / stranger matched: side view normal 98 / 38, bag 88 / 8, coat 96 / 8 (50 clips
   each); all angles normal 96 / 16.55, bag 80 / 7.45, coat 86 / 4.18 (550 clips each). Not checked on
