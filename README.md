@@ -8,6 +8,8 @@ gait-website/
   backend/    # FastAPI + PyTorch service around the model — see backend/README.md
 ```
 
+The Archive holds the CASIA-B gait dataset, described in [`DATASET.md`](./DATASET.md).
+
 ## Running the demo
 
 Double-click `start.bat` (or run it from cmd in this folder). It checks the setup, starts the

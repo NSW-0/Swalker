@@ -63,10 +63,12 @@ the background behind each item, see `HANDOFF.md`. For running the backend, see 
     preprocessing mode in three protocols (with counts like 796/1100), genuine/impostor distances
     and a threshold table. Detects flat, nested and wrapped dataset layouts. Run on real CASIA-B on
     Kaggle on 2026-10-28: baseline reproduced exactly
+  - `casia_videos`: raw CASIA-B videos into the Archive, held-out test clips and the measurements
+    (see `DATASET.md`)
   - `embed_video` (determinism check)
   - `calibrate_threshold` (genuine vs impostor distances)
   - `import_gallery_pkl` (import an old `gallery.pkl`)
-- **Quality:** ruff (lint + format) and 70 pytest tests. A new GitHub Actions job,
+- **Quality:** ruff (lint + format) and 88 pytest tests. A new GitHub Actions job,
   `.github/workflows/backend-ci.yml`, runs them on PRs.
 
 ### Frontend (`frontend/`): wired to the real API, mock data removed
@@ -107,8 +109,8 @@ the background behind each item, see `HANDOFF.md`. For running the backend, see 
 1. **Record real walking clips** of the team and others: side view, whole body in frame, 3–5 s,
    2–3 clips per person (HANDOFF §7.5). The Archive now holds the 124 CASIA-B people, built with
    `scripts/casia_videos.py`; the team's clips are not in it.
-2. **Check the match threshold on real video.** It is 7.2, measured on raw CASIA-B videos for
-   this Archive (1% of strangers get a name; see `backend/README.md`). Then run
+2. **Check the match threshold on real video.** It is 8.0, measured on raw CASIA-B videos for
+   this Archive (9.39% of strangers get a name over all angles; see `backend/README.md`). Then run
    `python -m scripts.calibrate_threshold videos\` on the team's clips to check it, set
    `SWALKER_MATCH_THRESHOLD` in `backend/.env`, and set `SWALKER_THRESHOLD_CALIBRATED=true`. Until
    then the Verdict page says the match line is provisional.
