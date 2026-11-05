@@ -68,7 +68,7 @@ Every setting is optional; see `.env.example` and `app/config.py`. The important
 | `SWALKER_PREPROCESS_MODE` | `casia_clip` | `casia_clip` = CASIA-B framing with one scale and position per clip; `casia` = the same per frame; `crop` = the old tight crop. Rank-1 for each in `app/ml/silhouettes.py` |
 | `SWALKER_TARGET_FPS` | `25` | clips are resampled to CASIA-B's frame rate first, so 60 fps phone video isn't slow motion to the model |
 | `SWALKER_MAX_FRAMES` | `120` | consecutive frames fed to the model (no subsampling, §6.2) |
-| `SWALKER_MATCH_THRESHOLD` | `7.2` | from raw CASIA-B videos, not yet checked on phone video, see below |
+| `SWALKER_MATCH_THRESHOLD` | `8.0` | measured on raw CASIA-B videos, not yet checked on phone video, see below |
 
 ## Scripts
 
@@ -84,16 +84,16 @@ Run them from `backend/` with the venv active.
 
 ## Not done yet / not measured
 
-- **Threshold:** 7.2 comes from `casia_videos evaluate` (2026-11-05): raw CASIA-B videos through
-  the real YOLO pipeline, the Archive as built (124 people, about 88 clips each), test clips from
-  people the model never trained on (075-124). 1% of strangers get a name at 7.17 over all angles
-  (1650 clips) and 7.16 at the side view (150 clips). At 7.2, right person accepted / stranger
-  matched: side view normal 94 / 6, bag 84 / 0, coat 90 / 0 (50 clips each, so one clip is 2 points);
-  all angles normal 90.55 / 2.73, bag 63.27 / 0.91, coat 70.18 / 0.18 (550 clips each). A stranger is a
-  test clip with its own person taken out of the comparison. It is still provisional: phone video has
-  not been measured against phone video in an Archive of this size. Check it with `calibrate_threshold` on
-  the team's recordings, put the result in `.env`, and set `SWALKER_THRESHOLD_CALIBRATED=true`. Until
-  then the Verdict page says the match line is provisional.
+- **Threshold:** 8.0, chosen by the team on 2026-11-05 to accept more of the right people, and
+  measured with `casia_videos evaluate`: raw CASIA-B videos through the real YOLO pipeline, the Archive
+  as built (124 people, about 88 clips each), test clips from people the model never trained on
+  (075-124). At 8.0, right person accepted / stranger matched: side view normal 98 / 38, bag 88 / 8,
+  coat 96 / 8 (50 clips each, so one clip is 2 points); all angles normal 96 / 16.55, bag 80 / 7.45, coat
+  86 / 4.18 (550 clips each). A stranger is a test clip with its own person taken out of the comparison.
+  A stricter line of 7.2 gives 1% of strangers overall. It is still provisional: phone video has not been
+  measured against phone video at this Archive size. Check it with `calibrate_threshold` on the team's
+  recordings, put the result in `.env`, and set `SWALKER_THRESHOLD_CALIBRATED=true`. Until then the
+  Verdict page says the match line is provisional. The dataset is described in `../DATASET.md`.
 - **Preprocessing:** measured on CASIA-B with `casia_eval` (2026-10-28/29, pooled Rank-1,
   NM / BG / CL): training-side framing 99.27 / 93.26 / 72.36, `casia_clip` 97.82 / 90.07 / 63.91,
   `casia` 96.09 / 78.05 / 35.73, `crop` 69.45 / 41.17 / 12.09. That uses CASIA-B's own masks;

@@ -6,26 +6,29 @@ Update this file at the end of each session.
 
 ## Current state
 
-- **`main`** has everything up to PR #22. All changes are listed in `CHANGELOG.md`; keep it updated.
+- **`main`** has everything up to PR #23. All changes are listed in `CHANGELOG.md`; keep it updated.
   Before writing "not merged", check `git log origin/main`: the user often merges quickly.
-- **Branch `nSawafta/casia-archive`** (PR not merged as of 2026-11-04): `scripts/casia_videos.py`.
+- **Branch `nSawafta/match-line-8`** (2026-11-05): match line 8 and `DATASET.md`. The user allows
+  Claude Code to open and merge its own PRs, but `gh` is not installed on this machine.
 - **Raw CASIA-B videos** are in `C:\Users\nabee\Desktop\datasets\DatasetB-{1,2}\DatasetB-{1,2}\video\`:
   124 people (B-1 has 001-062, B-2 has 063-124), 121 `.avi` each: 110 walks + 11 empty `bkgrd`.
 - **The import finished 2026-11-05.** `storage/gallery` holds 124 people and 10,909 clips, `datasets\tests\<name>\`
   holds 2,728 videos (bg-02, cl-02), the report is `datasets\dataset_report.md` + `.csv`. The vectors
   are cached in `backend/storage/casia_cache`, so `evaluate` and `build` take minutes, not hours.
   Results: `backend/storage/casia_videos_results.json` (at 8.5), `casia_videos_results_line_7.2.json`
-  (at 7.2); the log is `casia_run.log`, UTF-16, read it with PowerShell. Names are in `NAMES` in the
+  and `casia_videos_results_line_8.json`; the log is `casia_run.log`, UTF-16, read it with PowerShell. Names are in `NAMES` in the
   script (001 = Ahmad, 002 = Omar). Only 075-124 count for accuracy claims: 001-074 were in training.
 - **The old team Archive is in the Recycle Bin** until the user empties it.
-- **Match line is 7.2** (`config.py`; the user's `backend/.env` override was removed). New people,
-  Archive as built:
+- **Match line is 8** (`config.py`), the user's choice after seeing 7.2 below, to accept more of the
+  right people. `backend/.env` has no override. New people, Archive as built:
 
   | test | line | right person accepted | wrong person accepted | stranger matched |
   |---|---|---|---|---|
   | side view, normal / bag / coat (50 clips each) | 8.5 | 98 / 88 / 98 | 0 / 0 / 0 | 62 / 26 / 22 |
+  | side view, normal / bag / coat (50 clips each) | **8** | 98 / 88 / 96 | 0 / 0 / 0 | 38 / 8 / 8 |
   | side view, normal / bag / coat (50 clips each) | 7.2 | 94 / 84 / 90 | 0 / 0 / 0 | 6 / 0 / 0 |
   | all angles, normal / bag / coat (550 clips each) | 8.5 | 98.36 / 86.73 / 89.45 | 0 / 0.73 / 1.27 | 31.64 / 16.91 / 16.91 |
+  | all angles, normal / bag / coat (550 clips each) | **8** | 96 / 80 / 86 | 0 / 0.18 / 0.36 | 16.55 / 7.45 / 4.18 |
   | all angles, normal / bag / coat (550 clips each) | 7.2 | 90.55 / 63.27 / 70.18 | 0 / 0 / 0.18 | 2.73 / 0.91 / 0.18 |
 
   Same-person median distance, all angles: normal 5.72, bag 6.72, coat 6.57; side view 4.81 / 6.01 / 5.63.
@@ -34,7 +37,7 @@ Update this file at the end of each session.
   were all Unknown even at the old 8.5: nearest 9.43-13.09.
 - **Limits:** bg-02 and cl-02 come from the same CASIA-B recording setup as bg-01 and cl-01, so the
   gain from extra clips may be smaller with a different bag or coat. Phone clips of the same person were
-  11-12.7 apart in the first recordings (below), well past 7.2, so a team member added from a phone
+  11-12.7 apart in the first recordings (below), well past 8, so a team member added from a phone
   clip would probably come out Unknown. **Not measured:** phone normal-vs-normal; it needs second clips.
 - **Backend checks:** 88 pytest tests pass and ruff is clean. Run them from `backend/` with
   `.venv\Scripts\python -m pytest` and `.venv\Scripts\python -m ruff check .`. The system Python
