@@ -5,11 +5,26 @@ Measurements are given with what they were measured on. Add an entry with every 
 
 ## Not merged yet
 
-- **Changelog** (this file) and the rule in CLAUDE.md to keep it updated. Branch
-  `nSawafta/changelog`.
+- **Raw CASIA-B videos into the Archive** (`scripts/casia_videos.py`): vectors for all 110 walks of
+  each of the 124 people through the real YOLO pipeline (resumable cache), an Archive with a first
+  name per person (001 = Ahmad, 002 = Omar) and half of the bag and coat recordings, the other half
+  (bg-02, cl-02) copied to `datasets/tests`, a report of what the dataset holds per person
+  (`datasets/dataset_report.md`), and measurements that keep people from training (001-074) apart
+  from new people (075-124). The old Archive goes to the Recycle Bin. Case file silhouettes load
+  lazily. Branch `nSawafta/casia-archive`.
+- **Archive built from all 124 people** (2026-11-05): 10,909 clips, 2,728 test videos in
+  `datasets/tests`. 3 of the 13,640 walks could not be read (109-nm-01 at 126, 144 and 162 degrees).
+  New people (075-124), all angles, 550 clips each, Rank-1 normal / bag / coat: 99.64 / 92.91 / 62.18
+  with normal clips only, 99.82 / 96.55 / 96.91 with bg-01 and cl-01 added.
+- **Match line 7.2, was 8.5** (2026-11-05): at 8.5 this larger Archive gave 21.82% of strangers a name;
+  1% is at 7.17 (all angles, 1650 clips). At 7.2, new people, right person accepted / stranger matched:
+  side view normal 94 / 6, bag 84 / 0, coat 90 / 0 (50 clips each); all angles normal 90.55 / 2.73,
+  bag 63.27 / 0.91, coat 70.18 / 0.18 (550 clips each). Not checked on phone video, still marked
+  provisional. `.env.example` also named the wrong default framing (`casia`, now `casia_clip`).
 
 ## 2026-10-30
 
+- **Changelog** (this file) and the rule in CLAUDE.md to keep it updated (#22).
 - **Add clip from a case file goes straight to that person** (#21): no New / Existing choice or
   person picker when "Add clip" is pressed inside a case file.
 - **Several clips per person in the Archive** (#20). A person can have a normal clip, a bag clip,

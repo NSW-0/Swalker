@@ -36,12 +36,13 @@ class Settings(BaseSettings):
     display_frames: int = 10
 
     # Euclidean distance at or below which the closest walker counts as a match (HANDOFF §6.3).
-    # From scripts/casia_eval.py on CASIA-B (2026-10-29, casia_clip version 2, NM vs NM same
-    # view, side view 090): 1% of different-person pairs fall below 8.52, and 96.50% of
-    # same-person pairs do. All 11 views: 9.41 gives 1% false matches and 95.00% accepted.
-    # CASIA-B's masks are cleaner than YOLO's, so check it with scripts/calibrate_threshold.py on
-    # real recordings; set threshold_calibrated=true only after that.
-    match_threshold: float = 8.5
+    # From scripts/casia_videos.py (2026-11-05): raw CASIA-B videos through the real YOLO pipeline,
+    # Archive of 124 people with ~88 clips each, test clips from new people (075-124). 1% of strangers
+    # get a name at 7.17 (all angles, 1650 clips) and 7.16 (side view, 150 clips). The two agree, and
+    # this is the same 1% rule that gave the old 8.5, which lets 21.82% of strangers through here.
+    # Only for this Archive: phone video has not been measured (see SESSION_NOTES.md), so check it
+    # with scripts/calibrate_threshold.py on real recordings; set threshold_calibrated=true only after.
+    match_threshold: float = 7.2
     threshold_calibrated: bool = False
     top_k: int = 3
 

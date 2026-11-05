@@ -68,7 +68,7 @@ Every setting is optional; see `.env.example` and `app/config.py`. The important
 | `SWALKER_PREPROCESS_MODE` | `casia_clip` | `casia_clip` = CASIA-B framing with one scale and position per clip; `casia` = the same per frame; `crop` = the old tight crop. Rank-1 for each in `app/ml/silhouettes.py` |
 | `SWALKER_TARGET_FPS` | `25` | clips are resampled to CASIA-B's frame rate first, so 60 fps phone video isn't slow motion to the model |
 | `SWALKER_MAX_FRAMES` | `120` | consecutive frames fed to the model (no subsampling, §6.2) |
-| `SWALKER_MATCH_THRESHOLD` | `8.5` | from CASIA-B, not yet checked on real video, see below |
+| `SWALKER_MATCH_THRESHOLD` | `7.2` | from raw CASIA-B videos, not yet checked on phone video, see below |
 
 ## Scripts
 
@@ -78,18 +78,22 @@ Run them from `backend/` with the venv active.
 |---|---|
 | `python -m scripts.embed_video clip.mp4 --save-silhouettes out\` | embeds a clip twice: shape, norm, identical? |
 | `python -m scripts.casia_eval --root <CASIA-B> --checkpoint <pth>` | on Kaggle: Rank-1 for each preprocessing against the training-side framing (HANDOFF §6.1) plus genuine/impostor distances and a threshold table. Instructions at the top of the script |
+| `python -m scripts.casia_videos embed --root <datasets>`, then `evaluate`, then `build --root <datasets>` | raw CASIA-B videos into the Archive with bg-02 and cl-02 held out for testing, and the measurements. Instructions at the top of the script |
 | `python -m scripts.calibrate_threshold videos\` | `videos\<person>\*.mp4`, at least 2 people × 2 clips. Prints genuine/impostor distances and the threshold at several false-match rates |
 | `python -m scripts.import_gallery_pkl gallery.pkl --preprocess-mode crop` | imports an old `gallery.pkl` |
 
 ## Not done yet / not measured
 
-- **Threshold:** 8.5 comes from `casia_eval` on CASIA-B (2026-10-29, `casia_clip` version 2,
-  NM vs NM, same view). At the side view (090) 8.52 lets 1% of different-person pairs through and
-  accepts 96.50% of same-person pairs; over all 11 views 1% is at 9.41 (95.00% accepted). With N people in
-  the Archive, a stranger has roughly N times that 1% chance of landing under the line with
-  someone. It is still provisional: check it with `calibrate_threshold` on the team's recordings
-  (YOLO masks on real video are noisier than CASIA-B's), put the result in `.env`, and set
-  `SWALKER_THRESHOLD_CALIBRATED=true`. Until then the Verdict page says the match line is provisional.
+- **Threshold:** 7.2 comes from `casia_videos evaluate` (2026-11-05): raw CASIA-B videos through
+  the real YOLO pipeline, the Archive as built (124 people, about 88 clips each), test clips from
+  people the model never trained on (075-124). 1% of strangers get a name at 7.17 over all angles
+  (1650 clips) and 7.16 at the side view (150 clips). At 7.2, right person accepted / stranger
+  matched: side view normal 94 / 6, bag 84 / 0, coat 90 / 0 (50 clips each, so one clip is 2 points);
+  all angles normal 90.55 / 2.73, bag 63.27 / 0.91, coat 70.18 / 0.18 (550 clips each). A stranger is a
+  test clip with its own person taken out of the comparison. It is still provisional: phone video has
+  not been measured against phone video in an Archive of this size. Check it with `calibrate_threshold` on
+  the team's recordings, put the result in `.env`, and set `SWALKER_THRESHOLD_CALIBRATED=true`. Until
+  then the Verdict page says the match line is provisional.
 - **Preprocessing:** measured on CASIA-B with `casia_eval` (2026-10-28/29, pooled Rank-1,
   NM / BG / CL): training-side framing 99.27 / 93.26 / 72.36, `casia_clip` 97.82 / 90.07 / 63.91,
   `casia` 96.09 / 78.05 / 35.73, `crop` 69.45 / 41.17 / 12.09. That uses CASIA-B's own masks;

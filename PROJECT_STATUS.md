@@ -105,22 +105,23 @@ the background behind each item, see `HANDOFF.md`. For running the backend, see 
 ## Left to do (in order)
 
 1. **Record real walking clips** of the team and others: side view, whole body in frame, 3–5 s,
-   2–3 clips per person (HANDOFF §7.5).
-2. **Check the match threshold on real video.** It is 8.5, from `scripts/casia_eval.py` on
-   CASIA-B (1% false matches at the side view, 96.50% of same-person pairs accepted; see
-   `backend/README.md`). Then run `python -m scripts.calibrate_threshold videos\`
-   on the team's clips to check it, set `SWALKER_MATCH_THRESHOLD` in `backend/.env`, and set
-   `SWALKER_THRESHOLD_CALIBRATED=true`. Until then the Verdict page says the match line
-   is provisional.
-3. **Build the real Archive** from the recorded clips (Archive → "Add Case File").
+   2–3 clips per person (HANDOFF §7.5). The Archive now holds the 124 CASIA-B people, built with
+   `scripts/casia_videos.py`; the team's clips are not in it.
+2. **Check the match threshold on real video.** It is 7.2, measured on raw CASIA-B videos for
+   this Archive (1% of strangers get a name; see `backend/README.md`). Then run
+   `python -m scripts.calibrate_threshold videos\` on the team's clips to check it, set
+   `SWALKER_MATCH_THRESHOLD` in `backend/.env`, and set `SWALKER_THRESHOLD_CALIBRATED=true`. Until
+   then the Verdict page says the match line is provisional.
 
 ## Known issues / notes
 - **The site is wider than a phone screen** (every page measures 454 px wide on a 390 px phone).
   This comes from the shared layout (96 px nav rail plus page widths), not one page, so it needs
   a mobile pass on the shell.
-- Several clips per person are matched by the closest one, not averaged. How much extra clips
-  help on real video is not measured yet: it needs a second bag (or coat) clip of the same person
-  that isn't in the Archive.
+- Several clips per person are matched by the closest one, not averaged. On raw CASIA-B video,
+  new people, all angles, adding bg-01 and cl-01 to the normal clips took coat Rank-1 from 62.18 to
+  96.91 and bag from 92.91 to 96.55 (550 clips each). The test clips (bg-02, cl-02) come from the
+  same CASIA-B recording setup as the added clips, so a different bag or coat may gain less. Not
+  measured on phone video: it needs a second bag (or coat) clip of the same person.
 - The Archive is a single process's files. Run one backend instance, not several.
 - `backend/app/ml/combined_glfe_mstfe.py` must not be edited. A new architecture comes with its
   own checkpoint: replace both together.
