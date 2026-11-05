@@ -116,9 +116,9 @@ the background behind each item, see `HANDOFF.md`. For running the backend, see 
    then the Verdict page says the match line is provisional.
 
 ## Known issues / notes
-- **The site is wider than a phone screen** (every page measures 454 px wide on a 390 px phone).
-  This comes from the shared layout (96 px nav rail plus page widths), not one page, so it needs
-  a mobile pass on the shell.
+- **Phone layout:** all in the block at the end of `frontend/src/index.css`: a navigation bar along
+  the bottom, and each page fits the width and scrolls inside. Checked in headless Edge, not yet on a
+  real phone. A PC window narrower than 760 px gets it too.
 - Several clips per person are matched by the closest one, not averaged. On raw CASIA-B video,
   new people, all angles, adding bg-01 and cl-01 to the normal clips took coat Rank-1 from 62.18 to
   96.91 and bag from 92.91 to 96.55 (550 clips each). The test clips (bg-02, cl-02) come from the
