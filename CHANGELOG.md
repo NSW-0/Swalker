@@ -5,15 +5,20 @@ Measurements are given with what they were measured on. Add an entry with every 
 
 ## Not merged yet
 
-- **Match line 8, was 7.2** (2026-11-05), the team's choice to accept more of the right people. New
-  people, right person accepted / stranger matched: side view normal 98 / 38, bag 88 / 8, coat 96 / 8
-  (50 clips each); all angles normal 96 / 16.55, bag 80 / 7.45, coat 86 / 4.18 (550 clips each). Not
-  checked on phone video, still marked provisional. Branch `nSawafta/match-line-8`.
-- **`DATASET.md`**: what CASIA-B holds, how it is split and what was measured on it. Docs brought up
-  to date. Branch `nSawafta/match-line-8`.
+- **Phone layout** (2026-11-05): navigation in a bar along the bottom, every page fits the width and
+  scrolls inside, dialogs use more of the screen. Checked in headless Edge at 320, 360, 390 and 430 px
+  wide, a phone on its side and a small tablet: nothing wider than the screen in 78 captures. All in one
+  screen-size block in `index.css`. PC at 7 window sizes, 70 captures compared before and after: only the
+  random case number's tag moved, 40 of 35,812 element lines. Branch `nSawafta/phone-layout`.
 
 ## 2026-11-05
 
+- **Match line 8, was 7.2** (#24), the team's choice to accept more of the right people. New people,
+  right person accepted / stranger matched: side view normal 98 / 38, bag 88 / 8, coat 96 / 8 (50 clips
+  each); all angles normal 96 / 16.55, bag 80 / 7.45, coat 86 / 4.18 (550 clips each). Not checked on
+  phone video, still marked provisional.
+- **`DATASET.md`** (#24): what CASIA-B holds, how it is split and what was measured on it. Docs
+  brought up to date.
 - **Raw CASIA-B videos into the Archive** (#23, `scripts/casia_videos.py`): vectors for all 110 walks
   of each of the 124 people through the real YOLO pipeline (resumable cache), an Archive with a first
   name per person (001 = Ahmad, 002 = Omar) and half of the bag and coat recordings, the other half

@@ -49,4 +49,5 @@ Backend (`backend/`, see `backend/README.md`), with the venv in `backend/.venv`:
 - Scope page CSS under the page wrapper (`.page-verdict-content .x`), otherwise `.page p`
   overrides it.
 - Keep pages from scrolling as a whole: fixed header + fixed-height content with internal scroll.
+- Phone styles go only in the "Phones" block at the end of `frontend/src/index.css`, so PC can't change.
 - Colours come from the CSS variables in `frontend/src/index.css`; MUI theme is in `main.tsx`.

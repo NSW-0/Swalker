@@ -1585,3 +1585,373 @@ h3 {
   border: 1px solid rgba(245, 143, 124, 0.45);
   background: var(--accent-bg);
 }
+
+/* ── Phones ──────────────────────────────────────────────────────────
+   Phones in either direction: narrow screens, and touch screens up to landscape width. A PC window
+   only gets this below 760 px. Nothing outside this block is for phones, so PC stays as it is.
+   The navigation moves to a bar along the bottom. As on PC the page itself doesn't scroll: each page
+   fills the screen above the bar and scrolls inside, with its heading in normal flow instead of fixed. */
+@media (max-width: 760px), (pointer: coarse) and (max-width: 1000px) {
+  :root {
+    --phone-nav: 56px;
+  }
+
+  /* shell + navigation */
+
+  .app-shell {
+    padding-left: 0;
+    padding-bottom: var(--phone-nav);
+  }
+
+  .navbar {
+    top: auto;
+    right: 0;
+  }
+
+  .navbar-inner {
+    width: 100%;
+    height: var(--phone-nav);
+    padding: 0;
+    align-items: center;
+    border: none;
+    border-top: 1px solid var(--border);
+  }
+
+  .navbar nav {
+    flex-direction: row;
+    justify-content: space-around;
+    width: 100%;
+    gap: 0;
+  }
+
+  .nav-link {
+    width: 56px;
+    height: 44px;
+  }
+
+  .app-content {
+    max-width: none;
+    margin-left: 0;
+    padding: 0 16px;
+  }
+
+  .page {
+    height: calc(100svh - var(--phone-nav));
+    overflow-y: auto;
+  }
+
+  .page h1 {
+    font-size: 32px;
+  }
+
+  .page p {
+    font-size: 16px;
+  }
+
+  /* The 404 page, the only one with no layout of its own. */
+  .page > p + a {
+    display: inline-block;
+    padding: 8px 0;
+  }
+
+  .page > h1:first-child {
+    padding-top: 32px;
+  }
+
+  /* Home */
+
+  .page-hero {
+    margin-top: 0;
+    padding: 32px 0 16px;
+  }
+
+  .page-hero h1 {
+    font-size: 32px;
+  }
+
+  .page-hero .hero-sub {
+    font-size: 22px;
+    margin-bottom: 24px;
+  }
+
+  .hero-duck {
+    position: static;
+    display: block;
+    width: min(56vw, 240px);
+    margin: 24px auto 0;
+  }
+
+  /* Crime Scene */
+
+  .page-demo-content {
+    min-height: 0;
+    padding: 0 0 16px;
+  }
+
+  .demo-header {
+    position: static;
+    padding: 20px 0 16px;
+  }
+
+  .page-demo-content .demo-heading {
+    font-size: 32px;
+  }
+
+  .demo-evidence-group {
+    position: static;
+  }
+
+  .page-demo-content .demo-board-text {
+    max-width: none;
+    font-size: 18px;
+  }
+
+  .demo-bottom {
+    position: static;
+    transform: none;
+    margin-top: 20px;
+  }
+
+  .demo-duck {
+    position: static;
+    display: block;
+    width: min(44vw, 180px);
+    margin: auto auto 0;
+    padding-top: 16px;
+  }
+
+  /* Archive and About: the duck would cover the cards, there is no empty side for it here. */
+
+  .archive-duck,
+  .about-duck {
+    display: none;
+  }
+
+  .page-archive-content,
+  .page-about-content {
+    padding-top: 0;
+    overflow: hidden;
+  }
+
+  .archive-header,
+  .about-header {
+    position: static;
+    padding: 16px 0 8px;
+  }
+
+  .page-archive-content .archive-heading,
+  .page-about-content .about-heading {
+    font-size: 32px;
+  }
+
+  .page-archive-content .archive-subtext {
+    margin-bottom: 12px;
+    font-size: 15px;
+  }
+
+  .archive-grid-scroll,
+  .about-bubbles-scroll {
+    padding-right: 0;
+    padding-bottom: 16px;
+  }
+
+  .archive-grid {
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 10px;
+  }
+
+  .archive-card {
+    padding: 12px;
+  }
+
+  .page-archive-content .archive-card-person {
+    gap: 10px;
+  }
+
+  .page-archive-content .archive-card-person > div {
+    min-width: 0;
+  }
+
+  .page-archive-content .archive-card-id {
+    margin-bottom: 2px;
+    font-size: 16px;
+    line-height: 1.3;
+    overflow-wrap: anywhere;
+  }
+
+  .page-archive-content .archive-card-hint {
+    font-size: 13px;
+    line-height: 1.35;
+  }
+
+  .about-bubbles-scroll {
+    padding-top: 16px;
+  }
+
+  .about-bubble {
+    padding: 26px 18px 20px;
+  }
+
+  .about-bubble-title {
+    font-size: 19px;
+    margin-bottom: 12px;
+  }
+
+  .about-bubbles .about-bubble-text,
+  .about-bubble-steps {
+    font-size: 15px;
+  }
+
+  /* Verdict */
+
+  .page-verdict-content {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .page-verdict-content .verdict-back {
+    top: 12px;
+    left: 12px;
+    width: 40px;
+    height: 40px;
+  }
+
+  .page-verdict-content .verdict-header {
+    position: static;
+    flex-shrink: 0;
+    padding: 12px 36px 4px;
+  }
+
+  .page-verdict-content .verdict-heading {
+    margin-bottom: 4px;
+    font-size: 28px;
+  }
+
+  .page-verdict-content .verdict-caseline {
+    gap: 4px 8px;
+    font-size: 13px;
+    overflow-wrap: anywhere;
+  }
+
+  .page-verdict-content .verdict-tag {
+    padding: 2px 10px;
+    font-size: 12px;
+  }
+
+  .page-verdict-content .loader {
+    position: static;
+    flex: 1;
+    min-height: 0;
+    padding-bottom: 0;
+    overflow: hidden;
+  }
+
+  /* 300 px across in the markup: scaled, with the margin taking back the space it no longer uses. */
+  .page-verdict-content .loader-ring {
+    flex-shrink: 0;
+    margin: -37px;
+    transform: scale(0.75);
+  }
+
+  .page-verdict-content .loader-step {
+    font-size: 18px;
+    text-align: center;
+  }
+
+  .page-verdict-content .verdict-stage {
+    position: static;
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 20px 0 16px;
+  }
+
+  .page-verdict-content .verdict-stage > * {
+    flex-shrink: 0;
+  }
+
+  .page-verdict-content .verdict-case,
+  .page-verdict-content .verdict-lower,
+  .page-verdict-content .verdict-lineup {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .page-verdict-content .verdict-bubble {
+    padding: 24px 18px 18px;
+  }
+
+  .page-verdict-content .verdict-evidence-panel {
+    padding: 16px 14px;
+  }
+
+  /* Half a phone's width is too little for the empty case file's text and button. */
+  @media (max-width: 480px) {
+    .page-verdict-content .is-unknown .verdict-evidence-pair {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+
+  /* It is only hidden on short PC screens because that page can't scroll. */
+  .page-verdict-content .verdict-trail-panel {
+    display: block;
+  }
+
+  .page-verdict-content .verdict-duck {
+    display: none;
+  }
+
+  /* Dialogs: more of the narrow screen, and rows of buttons wrap. */
+
+  .MuiDialog-root .MuiDialog-paper {
+    width: calc(100% - 24px);
+    max-height: calc(100% - 24px);
+    margin: 12px;
+  }
+
+  .archive-actions-row,
+  .archive-actions-rename {
+    flex-wrap: wrap;
+  }
+
+  .archive-actions-rename .MuiTextField-root {
+    flex: 1 1 100%;
+  }
+
+  .archive-clip-confirm {
+    flex-wrap: wrap;
+  }
+
+  .archive-clip-head .MuiButton-root {
+    min-height: 36px;
+  }
+
+  /* Phone on its side: little height, so headings shrink and the ring gets smaller. */
+  @media (max-height: 500px) {
+    .page-hero {
+      padding-top: 16px;
+    }
+
+    .demo-header,
+    .archive-header,
+    .about-header {
+      padding: 8px 0 4px;
+    }
+
+    .page-demo-content .demo-heading,
+    .page-archive-content .archive-heading,
+    .page-about-content .about-heading,
+    .page-verdict-content .verdict-heading {
+      font-size: 24px;
+    }
+
+    .page-archive-content .archive-subtext {
+      display: none;
+    }
+
+    .page-verdict-content .loader-ring {
+      margin: -75px;
+      transform: scale(0.5);
+    }
+  }
+}

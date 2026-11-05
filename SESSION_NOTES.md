@@ -6,10 +6,10 @@ Update this file at the end of each session.
 
 ## Current state
 
-- **`main`** has everything up to PR #23. All changes are listed in `CHANGELOG.md`; keep it updated.
+- **`main`** has everything up to PR #24. All changes are listed in `CHANGELOG.md`; keep it updated.
   Before writing "not merged", check `git log origin/main`: the user often merges quickly.
-- **Branch `nSawafta/match-line-8`** (2026-11-05): match line 8 and `DATASET.md`. The user allows
-  Claude Code to open and merge its own PRs, but `gh` is not installed on this machine.
+- **The user allows Claude Code to open and merge its own PRs** (2026-11-05). `gh` is installed and
+  logged in as NSW-0. Put the PR number in the changelog before merging.
 - **Raw CASIA-B videos** are in `C:\Users\nabee\Desktop\datasets\DatasetB-{1,2}\DatasetB-{1,2}\video\`:
   124 people (B-1 has 001-062, B-2 has 063-124), 121 `.avi` each: 110 walks + 11 empty `bkgrd`.
 - **The import finished 2026-11-05.** `storage/gallery` holds 124 people and 10,909 clips, `datasets\tests\<name>\`
@@ -114,8 +114,10 @@ masks; YOLO's mask quality on real video is **not** measured by them.
    rewritten on the next change). Matching: closest clip per person (`matching.rank(groups=)`).
    Checked end to end with the real models on a copy of the Archive. **Not measured yet:**
    whether it helps on real video; needs a second bag clip of someone whose first bag clip is in
-   the Archive. **Not started:** the phone-width layout (every page is 454 px wide on a 390 px
-   phone; the shared shell, not one page).
+   the Archive. The phone layout is done (`nSawafta/phone-layout`), checked in headless Edge but
+   not yet on a real phone. To compare PC before and after a CSS change: drive headless Edge
+   over its DevTools port (Node 24 has WebSocket, nothing to install) and save every element's box and
+   styles per page and size. Ignore `.verdict-tag`: the case number is random, so its width changes.
 5. **Real recordings** (needs the team): record clips, run `scripts/calibrate_threshold`, build
    the Archive (`PROJECT_STATUS.md` → "Left to do").
 
