@@ -1,6 +1,6 @@
 # Session notes: where the last Claude Code session stopped
 
-Last updated 2026-11-04. Read this after `HANDOFF.md`. It covers work in progress, the next
+Last updated 2026-11-05. Read this after `HANDOFF.md`. It covers work in progress, the next
 steps, and things learned the hard way. For what is built overall, see `PROJECT_STATUS.md`.
 Update this file at the end of each session.
 
@@ -11,18 +11,31 @@ Update this file at the end of each session.
 - **Branch `nSawafta/casia-archive`** (PR not merged as of 2026-11-04): `scripts/casia_videos.py`.
 - **Raw CASIA-B videos** are in `C:\Users\nabee\Desktop\datasets\DatasetB-{1,2}\DatasetB-{1,2}\video\`:
   124 people (B-1 has 001-062, B-2 has 063-124), 121 `.avi` each: 110 walks + 11 empty `bkgrd`.
-- **Long run started 2026-11-04** in its own PowerShell window (`embed`, then `evaluate`, then
-  `build`), logging to `backend/storage/casia_run.log`: about 5.2 hours at 1.41 s/clip, resumable by
-  running the same `embed` again (`backend/storage/casia_cache/<person>.npz`).
-  When it has finished, read the log and the results (`backend/storage/casia_videos_results.json`),
-  then set the match line from its threshold table. `build` refuses while the backend is running;
-  if so, close the backend and run `python -m scripts.casia_videos build --root <datasets>`.
-  It sends the old Archive to the Recycle Bin, copies bg-02 and cl-02 to `datasets\tests\<name>\`
-  and writes `datasets\dataset_report.md` + `.csv`. Names: `NAMES` in the script (001 = Ahmad, 002 =
-  Omar). The log is UTF-16 (PowerShell Tee-Object): read it with PowerShell, not grep.
-- **Expect 8.5 to be wrong for this Archive:** a stranger is now compared with ~88 clips of each of
-  123 people, so their nearest distance is smaller than the same-view pair numbers 8.5 came from.
-  Only the new people (075-124) count for accuracy claims: 001-074 were in the training set.
+- **The import finished 2026-11-05.** `storage/gallery` holds 124 people and 10,909 clips, `datasets\tests\<name>\`
+  holds 2,728 videos (bg-02, cl-02), the report is `datasets\dataset_report.md` + `.csv`. The vectors
+  are cached in `backend/storage/casia_cache`, so `evaluate` and `build` take minutes, not hours.
+  Results: `backend/storage/casia_videos_results.json` (at 8.5), `casia_videos_results_line_7.2.json`
+  (at 7.2); the log is `casia_run.log`, UTF-16, read it with PowerShell. Names are in `NAMES` in the
+  script (001 = Ahmad, 002 = Omar). Only 075-124 count for accuracy claims: 001-074 were in training.
+- **The old team Archive is in the Recycle Bin** until the user empties it.
+- **Match line is 7.2** (`config.py`; the user's `backend/.env` override was removed). New people,
+  Archive as built:
+
+  | test | line | right person accepted | wrong person accepted | stranger matched |
+  |---|---|---|---|---|
+  | side view, normal / bag / coat (50 clips each) | 8.5 | 98 / 88 / 98 | 0 / 0 / 0 | 62 / 26 / 22 |
+  | side view, normal / bag / coat (50 clips each) | 7.2 | 94 / 84 / 90 | 0 / 0 / 0 | 6 / 0 / 0 |
+  | all angles, normal / bag / coat (550 clips each) | 8.5 | 98.36 / 86.73 / 89.45 | 0 / 0.73 / 1.27 | 31.64 / 16.91 / 16.91 |
+  | all angles, normal / bag / coat (550 clips each) | 7.2 | 90.55 / 63.27 / 70.18 | 0 / 0 / 0.18 | 2.73 / 0.91 / 0.18 |
+
+  Same-person median distance, all angles: normal 5.72, bag 6.72, coat 6.57; side view 4.81 / 6.01 / 5.63.
+- **Checked through the real backend (2026-11-05):** 5 held-out side-view clips all named the right
+  person at 5.55-6.74, next person from 8.79. The 13 team phone clips, none of them in this Archive,
+  were all Unknown even at the old 8.5: nearest 9.43-13.09.
+- **Limits:** bg-02 and cl-02 come from the same CASIA-B recording setup as bg-01 and cl-01, so the
+  gain from extra clips may be smaller with a different bag or coat. Phone clips of the same person were
+  11-12.7 apart in the first recordings (below), well past 7.2, so a team member added from a phone
+  clip would probably come out Unknown. **Not measured:** phone normal-vs-normal; it needs second clips.
 - **Backend checks:** 88 pytest tests pass and ruff is clean. Run them from `backend/` with
   `.venv\Scripts\python -m pytest` and `.venv\Scripts\python -m ruff check .`. The system Python
   has no ruff.
