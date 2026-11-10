@@ -3,7 +3,8 @@
 Gait recognition website for a Birzeit University ECE graduation project. React frontend
 (`frontend/`) and FastAPI + PyTorch backend (`backend/`), wired together; no mock data left. What
 remains is mostly real recordings of people and checking the threshold on them. `DATASET.md`
-describes CASIA-B, the dataset in the Archive.
+describes CASIA-B, the dataset in the Archive; `PROJECT_SUMMARY.md` is the overview of the method
+and the measurements: update it when either changes.
 
 **Read `HANDOFF.md` before starting any task.** It explains the model, the frontend, the API the
 frontend expects, and known problems in the inference scripts. Then read `SESSION_NOTES.md`:

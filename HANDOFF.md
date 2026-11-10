@@ -3,6 +3,10 @@
 Written 2026-10-19 for whoever picks this up next, most likely Claude Code working in this repo.
 Read this whole file before writing any backend code. `CLAUDE.md` has the short version of the rules.
 
+> **Since then (2026-11-10):** the backend in §7 is built and the frontend uses it; sections 2, 3.1,
+> 3.2 and 7 describe the state on 2026-10-19. For the current state see `PROJECT_STATUS.md`, for
+> what was done and measured `PROJECT_SUMMARY.md`. Sections 4, 6 and 8 still hold.
+
 ---
 
 ## 1. What this project is

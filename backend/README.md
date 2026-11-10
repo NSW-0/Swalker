@@ -1,8 +1,9 @@
 # Swalker backend
 
-FastAPI service around GLTNet. Takes a walking clip, finds the person with YOLOv8-seg, turns each
-frame into a 64×44 silhouette, encodes the sequence into a 4096-number gait signature, and compares
-it with the Archive.
+FastAPI service around GLTNet. Takes a walking clip, resamples it to 25 fps, finds the walker with
+YOLOv8-seg, frames each mask as a 64×44 CASIA-B style silhouette, encodes up to 120 consecutive
+silhouettes into a 4096-number gait signature, and compares it with every clip in the Archive. Why
+each step is done that way: `../PROJECT_SUMMARY.md` §4.
 
 ## Setup (Windows, cmd)
 
@@ -31,7 +32,37 @@ Use `python -m uvicorn`, not plain `uvicorn`: a `uvicorn` installed globally wou
 Python, which may not have the backend's packages (`No module named 'cv2'`).
 
 Then `cd frontend` and run `npm run dev`. Vite proxies `/api` to port 8000. Check
-http://localhost:8000/api/health: `modelLoaded` should be `true`.
+http://localhost:8000/api/health: `modelLoaded` should be `true`. Or run `start.bat` in the repo
+folder, which starts both.
+
+## Layout
+
+```
+app/
+  main.py          app factory; loads YOLO and GLTNet once at startup
+  config.py        settings (SWALKER_* in .env)
+  api/             routes: health, gallery (the Archive), identify (as a job), uploads
+  ml/              combined_glfe_mstfe.py (frozen copy), silhouettes.py (YOLO, tracking, framing),
+                   embed.py (GLTNet), pipeline.py (video to signature)
+  gallery/         store.py (the Archive on disk), matching.py (distances, closest clip per person)
+  jobs.py          identify jobs and their progress
+  queries.py       recent walks kept for 30 minutes, so one can be saved without uploading again
+scripts/           evaluation, import and measurement scripts (below)
+tests/             pytest; fake models, so no weights needed
+```
+
+## API
+
+| Method | Path | Does |
+|---|---|---|
+| GET | `/api/health` | models loaded, device, Archive size, match line, upload limits |
+| POST | `/api/identify` | upload a clip; returns a `jobId` straight away |
+| GET | `/api/identify/{jobId}/status` | stage, progress, and the result when done |
+| GET | `/api/gallery`, `/api/gallery/{id}` | the Archive, one case file with its clips |
+| POST | `/api/gallery`, `/api/gallery/from-video` | new person from a walk just identified (`queryId`), or from a video |
+| POST | `/api/gallery/{id}/clips`, `/api/gallery/{id}/clips/from-video` | another clip of someone |
+| DELETE | `/api/gallery/{id}/clips/{clipId}` | remove a clip (not the last) |
+| PATCH / DELETE | `/api/gallery/{id}` | rename, delete |
 
 ## Check
 
@@ -41,15 +72,20 @@ ruff format --check .
 pytest
 ```
 
-The tests use fake models, so they run without weights. `tests/test_real_checkpoint.py` also runs
-when `models/stage2_iter70000.pth` is present.
+88 tests. They use fake models, so they run without weights. `tests/test_real_checkpoint.py` also
+runs when `models/stage2_iter70000.pth` is present. CI runs all three on pull requests to `main`.
 
 ## What the Archive stores
 
-`storage/gallery/` (git-ignored) holds:
-- `features.npy`: one 4096-d vector per person
-- `index.json`: name, clip file name, date, preprocessing + checkpoint used
-- `silhouettes/<person>/*.png`: about 10 small silhouettes for display
+`storage/gallery/` (git-ignored) holds, for every person, one or more clips (a normal walk, with a
+bag, in a coat…):
+- `features.npy`: one 4096-d vector per clip
+- `index.json` (version 2): people and their clips (clip file name, date), plus the framing, its
+  version, the checkpoint and the frame rate the Archive was built with
+- `silhouettes/<person>/<clip>/*.png`: about 10 small silhouettes per clip, for display
+
+Right now it holds the 124 CASIA-B people with 88 clips each, built by `scripts/casia_videos.py`
+(`../DATASET.md`).
 
 Uploaded videos are written to a temp file, processed, and deleted. They are never kept.
 

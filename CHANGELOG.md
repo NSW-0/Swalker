@@ -3,6 +3,14 @@
 What changed in Swalker, newest first, one line per change with the PR that brought it to `main`.
 Measurements are given with what they were measured on. Add an entry with every PR (see CLAUDE.md).
 
+## Not merged yet
+
+- **Docs** (2026-11-10): `PROJECT_SUMMARY.md`, how the website was built: the method, every pipeline
+  step and why, how CASIA-B was used, the measurements and the limits. All three READMEs rewritten
+  (the frontend one still said there was no backend; the backend one described one vector per
+  person). `PROJECT_STATUS.md` and a note at the top of `HANDOFF.md` brought up to date. Branch
+  `nSawafta/docs-summary`.
+
 ## 2026-11-05
 
 - **Phone layout** (#25): navigation in a bar along the bottom, every page fits the width and

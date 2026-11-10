@@ -1,73 +1,72 @@
-# GLTNet Gait Recognition — Web Frontend
+# Swalker frontend
 
-Frontend for the GLTNet gait recognition project (Birzeit University ECE graduation project).
-Built with React 19, Vite, TypeScript, and React Router.
-
-There is no backend wired in yet — this is frontend scaffolding only. A backend/API for the
-actual model will be added later once the site's UI is further along.
+The website: React 19, Vite, TypeScript, React Router and MUI, with a detective theme. It needs the
+backend (`../backend`) running for anything past the Home and About pages.
 
 ## Requirements
 
-- Node.js 20+ and npm
+- Node.js 20+ and npm (CI uses Node 22)
+- The backend on port 8000, see [`../backend/README.md`](../backend/README.md). Or start both with
+  `start.bat` in the repo folder.
 
-## Setup
+## Setup and run
 
-```bash
-npm install
 ```
-
-This also installs the git pre-commit hook (via the `prepare` script → Husky), so ESLint
-runs automatically on staged `.ts`/`.tsx` files before every commit.
-
-## Run locally
-
-```bash
+npm install
 npm run dev
 ```
 
-Opens the dev server, by default at http://localhost:5173.
+The site opens at http://localhost:5173. The dev server passes every `/api` request on to
+http://localhost:8000 (`vite.config.ts`).
 
-## Other scripts
+`npm install` also installs a pre-commit hook (Husky + lint-staged) that runs `eslint --fix` on
+staged `.ts`/`.tsx` files. If it stops firing, run `npx husky`.
 
-```bash
-npm run build     # type-check and build for production (outputs to dist/)
-npm run preview   # preview the production build locally
-npm run lint      # run ESLint across the project
+## Scripts
+
+```
+npm run dev       # development server
+npm run build     # type-check and build for production (dist/)
+npm run preview   # serve the production build
+npm run lint      # ESLint
 ```
 
-## Project structure
+`npm run lint` and `npm run build` must pass; CI runs them on pull requests to `main`.
+
+## Pages
+
+| Route | File | What it does |
+|---|---|---|
+| `/` | `routes/Home.tsx` | Landing page |
+| `/crime-scene` | `routes/Demo.tsx` | Pick a walking clip; checks type and size before upload |
+| `/crime-scene/verdict` | `routes/Verdict.tsx` | Runs the identification, shows the loading screen, then the result: match or unknown, distance scale, silhouettes, the closest 3 walks. An unknown walker can be saved to the Archive |
+| `/archive` | `routes/Archive.tsx` | Everyone in the Archive. A case file shows each clip; add a person or a clip, remove a clip, rename, delete. `?person=<name>` opens that case file |
+| `/about` | `routes/About.tsx` | How it works, gait recognition, the model and its accuracy |
+
+## Structure
 
 ```
 src/
-  main.tsx              # entry point, mounts RouterProvider
-  router.tsx             # route definitions (createBrowserRouter)
-  routes/                 # one file per route/page
-    RootLayout.tsx        # shared layout (Navbar + Footer + <Outlet/>)
-    Home.tsx
-    Demo.tsx               # placeholder for the interactive gait demo
-    About.tsx
-    NotFound.tsx
-  components/
-    layout/                # Navbar, Footer, and other layout pieces
-  index.css                # global styles
+  main.tsx                   entry point and MUI theme
+  router.tsx                 routes
+  routes/                    one file per page, plus RootLayout.tsx (navigation + per-page background)
+  api/client.ts              calls to the backend, its types, friendly error messages
+  api/useUploadLimits.ts     upload limits from /api/health
+  data/clueStore.ts          the clip picked on the Crime Scene, passed to the Verdict page
+  components/layout/         Navbar (Footer.tsx is not used at the moment)
+  components/verdict/        loading screen, distance scale, silhouette player and thumbnails
+  i18n/                      i18next, set up but barely used
+  assets/                    backgrounds, ducks, sprite, swalker.ico
+  index.css                  all styles; colours are CSS variables at the top
 ```
 
-As the site grows, add new pages under `src/routes/` and register them in `src/router.tsx`.
-Reusable UI pieces go under `src/components/`.
+## Styling rules
 
-## Linting
-
-ESLint is configured via the flat config in `eslint.config.js`, with:
-
-- `@eslint/js` recommended rules
-- `typescript-eslint` recommended rules
-- `eslint-plugin-react-hooks` recommended rules
-- `eslint-plugin-react-refresh` (Vite HMR safety)
-
-Run `npm run lint` any time, or rely on the pre-commit hook to catch issues automatically.
-
-## Git hooks (Husky + lint-staged)
-
-A pre-commit hook (`.husky/pre-commit`) runs `lint-staged`, which runs `eslint --fix` on any
-staged `.ts`/`.tsx` files. This is set up automatically when you run `npm install` (via the
-`prepare` script). If hooks ever stop firing, re-run `npx husky`.
+- Colours come from the CSS variables at the top of `src/index.css`; the MUI theme is in `main.tsx`.
+- Scope page styles under the page wrapper (`.page-verdict-content .x`), otherwise the generic
+  `.page p` rule wins.
+- Pages don't scroll as a whole: a header plus a fixed-height area that scrolls inside. A taller page
+  would also zoom the background image.
+- **Phones:** every phone style is in the "Phones" block at the end of `index.css`. It applies
+  below 760 px wide, or below 1000 px on a touch screen. The navigation moves to a bar along the
+  bottom. Keeping phone styles there means the PC layout can't change.
