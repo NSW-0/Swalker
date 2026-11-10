@@ -58,4 +58,4 @@ Reading these numbers:
   / coat, standard protocol) with the normal-clips-only Archive here: 99.64 / 92.91 / 62.18.
 - `bg-02` and `cl-02` come from the same recording setup as `bg-01` and `cl-01`, so a different bag
   or coat may do worse.
-- Phone video has not been measured against phone video at this Archive size. See `SESSION_NOTES.md`.
+- Phone video has not been measured against phone video at this Archive size. See `RESULTS.md`.

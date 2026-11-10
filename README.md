@@ -28,16 +28,30 @@ First-time setup:
 The Archive is not in the repo. It currently holds the 124 people of the CASIA-B dataset, built with
 `backend/scripts/casia_videos.py` (see [`DATASET.md`](DATASET.md)).
 
+## Results
+
+Details and every table: [`RESULTS.md`](RESULTS.md).
+
+- **The model** (CASIA-B benchmark, people it never trained on): Rank-1 99.27% normal walking, 93.26%
+  with a bag, 72.36% in a coat.
+- **The website's pipeline** on the same silhouettes: 97.82 / 90.07 / 63.91. The original script's
+  tight crop gave 69.45 / 41.17 / 12.09.
+- **Raw CASIA-B video through the website**, with a bag and a coat clip of each person in the Archive:
+  Rank-1 99.82 / 96.55 / 96.91. Over all camera angles at the match line of 8, the right person is
+  accepted 96 / 80 / 86% of the time, and 16.55 / 7.45 / 4.18% of strangers get a name.
+- **Phone video:** the match line for phone clips is not set yet. It needs two normal walks of the
+  same people.
+
 ## Documents
 
 | File | What it is |
 |---|---|
 | [`PROJECT_SUMMARY.md`](PROJECT_SUMMARY.md) | How the website was built: method, pipeline, dataset use, measurements, limits |
+| [`RESULTS.md`](RESULTS.md) | Every measurement, with what it was measured on |
 | [`DATASET.md`](DATASET.md) | CASIA-B: what it holds, how it was split, results on it |
-| [`PROJECT_STATUS.md`](PROJECT_STATUS.md) | What is built and what is left |
+| [`PROJECT_STATUS.md`](PROJECT_STATUS.md) | What is built, what is left, notes for whoever continues |
 | [`CHANGELOG.md`](CHANGELOG.md) | Every change, with its date and pull request |
 | [`HANDOFF.md`](HANDOFF.md) | The model, the original scripts' problems and the plan the backend followed (2026-10-19) |
-| [`SESSION_NOTES.md`](SESSION_NOTES.md) | Working notes between development sessions |
 | [`CLAUDE.md`](CLAUDE.md) | Short rules for Claude Code in this repo |
 
 ## Checks
