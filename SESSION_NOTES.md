@@ -8,7 +8,7 @@ Update this file at the end of each session.
 
 - **`PROJECT_SUMMARY.md`** (2026-11-10) is the overview of the whole project for the team's report:
   update it with any new measurement or method change.
-- **`main`** has everything up to PR #25. All changes are listed in `CHANGELOG.md`; keep it updated.
+- **`main`** has everything up to PR #26. All changes are listed in `CHANGELOG.md`; keep it updated.
   Before writing "not merged", check `git log origin/main`: the user often merges quickly.
 - **The user allows Claude Code to open and merge its own PRs** (2026-11-05). `gh` is installed and
   logged in as NSW-0. Put the PR number in the changelog before merging.
