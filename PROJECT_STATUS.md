@@ -1,7 +1,8 @@
 # Swalker: project status
 
-Last updated 2026-10-28. What has been built, and what is still left. For how the model works and
-the background behind each item, see `HANDOFF.md`. For running the backend, see `backend/README.md`.
+Last updated 2026-11-10. What has been built, and what is still left. For how the model works and
+the background behind each item, see `HANDOFF.md`; for the method and the measurements,
+`PROJECT_SUMMARY.md`. For running the backend, see `backend/README.md`.
 
 ## Done
 
@@ -101,8 +102,13 @@ the background behind each item, see `HANDOFF.md`. For running the backend, see 
   (CUDA, ~1.3 s warm).
 - End-to-end through the browser (headless Edge) with real models, all without console errors:
   match, unknown, save, empty Archive and the no-person error.
-- **Limit of these checks:** there were no real walking videos available. The test clips are panned
-  photos, which prove the pipeline runs but say **nothing about accuracy**.
+- **Raw CASIA-B videos** through the real pipeline (2026-11-05), people the model never trained on:
+  Rank-1 99.82 / 96.55 / 96.91 for normal / bag / coat over all angles, with the Archive as built.
+  At the match line of 8 the right person is accepted 96 / 80 / 86% of the time, and 16.55 / 7.45 /
+  4.18% of strangers get a name. Details in `DATASET.md`.
+- **Phone recordings** (2026-10-30): 10 people, one normal walk each. The right person was closest
+  for 2 of 3 bag and coat clips, but at distances (10.97-12.66) that overlap with different people
+  (from 9.80). Normal against normal on phone video is not measured yet.
 
 ## Left to do (in order)
 
