@@ -3,15 +3,12 @@
 What changed in Swalker, newest first, one line per change with the PR that brought it to `main`.
 Measurements are given with what they were measured on. Add an entry with every PR (see CLAUDE.md).
 
-## Not merged yet
-
-- **`RESULTS.md`** (2026-11-10): every measurement in one place, the CASIA-B tables generated from
-  the saved result files, with a short summary also in `README.md`. `SESSION_NOTES.md` removed: its
-  results are in `RESULTS.md`, and the laptop paths, lessons learned and working rules moved to
-  `PROJECT_STATUS.md` ("Notes for whoever continues") and `CLAUDE.md`. Branch `nSawafta/results-doc`.
-
 ## 2026-11-10
 
+- **`RESULTS.md`** (#27): every measurement in one place, the CASIA-B tables generated from
+  the saved result files, with a short summary also in `README.md`. `SESSION_NOTES.md` removed: its
+  results are in `RESULTS.md`, and the laptop paths, lessons learned and working rules moved to
+  `PROJECT_STATUS.md` ("Notes for whoever continues") and `CLAUDE.md`.
 - **Project summary and READMEs** (#26): `PROJECT_SUMMARY.md`, how the website was built: the method, every pipeline
   step and why, how CASIA-B was used, the measurements and the limits. All three READMEs rewritten
   (the frontend one still said there was no backend; the backend one described one vector per
