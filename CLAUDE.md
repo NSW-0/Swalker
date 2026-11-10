@@ -7,9 +7,9 @@ describes CASIA-B, the dataset in the Archive; `PROJECT_SUMMARY.md` is the overv
 and the measurements: update it when either changes.
 
 **Read `HANDOFF.md` before starting any task.** It explains the model, the frontend, the API the
-frontend expects, and known problems in the inference scripts. Then read `SESSION_NOTES.md`:
-where the last session stopped, the next steps, and lessons learned. Update it before a session
-ends.
+frontend expects, and known problems in the inference scripts. Then read `PROJECT_STATUS.md`:
+what is built, what is left, where things are on the laptop and lessons learned. Update it before a
+session ends. New measurements go in `RESULTS.md`.
 
 **Keep `CHANGELOG.md` up to date:** every change gets a dated line there, in the same branch as
 the change (under "Not merged yet" until its PR is merged, then under the merge date with the PR
@@ -43,7 +43,9 @@ Backend (`backend/`, see `backend/README.md`), with the venv in `backend/.venv`:
 
 - Developer machine is Windows, shell is cmd. Give git commands that work in cmd (no `&` in
   branch names, no bash-only syntax).
-- Branches: `nSawafta/<topic>`, merged into `main` via PR. Stage files by name.
+- Branches: `nSawafta/<topic>`, merged into `main` via PR. Stage files by name. Claude Code may
+  open and merge its own PRs with `gh` once CI passes.
+- `backups/`, `frontend/src/assets/duckNoGem.png` and `wing.png` are untracked on purpose: leave them.
 
 ## Frontend conventions
 

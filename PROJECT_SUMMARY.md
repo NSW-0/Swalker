@@ -9,7 +9,8 @@ identifies a person from the way they walk, without their face. The website show
 work: a visitor uploads a walking clip and the site either names the person from its Archive or
 says the walker is unknown.
 
-Other documents go deeper: [`DATASET.md`](DATASET.md) (the dataset),
+Other documents go deeper: [`RESULTS.md`](RESULTS.md) (every measurement in full),
+[`DATASET.md`](DATASET.md) (the dataset),
 [`PROJECT_STATUS.md`](PROJECT_STATUS.md) (what is built), [`CHANGELOG.md`](CHANGELOG.md) (every
 change with its date and PR), [`HANDOFF.md`](HANDOFF.md) (the model and the original plan),
 [`backend/README.md`](backend/README.md) and [`frontend/README.md`](frontend/README.md).

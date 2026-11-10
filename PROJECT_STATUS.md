@@ -2,7 +2,8 @@
 
 Last updated 2026-11-10. What has been built, and what is still left. For how the model works and
 the background behind each item, see `HANDOFF.md`; for the method and the measurements,
-`PROJECT_SUMMARY.md`. For running the backend, see `backend/README.md`.
+`PROJECT_SUMMARY.md`; every measurement, `RESULTS.md`. For running the backend, see
+`backend/README.md`.
 
 ## Done
 
@@ -133,3 +134,58 @@ the background behind each item, see `HANDOFF.md`; for the method and the measur
 - The Archive is a single process's files. Run one backend instance, not several.
 - `backend/app/ml/combined_glfe_mstfe.py` must not be edited. A new architecture comes with its
   own checkpoint: replace both together.
+
+## Notes for whoever continues
+
+Read `HANDOFF.md` first, then this file. Update this file before a session ends; every change also
+gets a line in `CHANGELOG.md`, and new measurements go in `RESULTS.md`.
+
+**Working in this repo**
+- Before saying something isn't merged, run `git fetch` and check `git log origin/main`: the user
+  merges quickly. Commits pushed to a branch after its PR merged are not on `main`; they need a new
+  branch.
+- Claude Code may open and merge its own PRs with `gh` (logged in as NSW-0) once CI passes. Put the
+  PR number in the changelog before merging.
+- The backend checks run from `backend/` with `.venv\Scripts\python -m pytest` and
+  `.venv\Scripts\python -m ruff check .`. The system Python has no ruff.
+
+**Where things are on the laptop** (none of it is in the repo)
+- Raw CASIA-B videos: `C:\Users\nabee\Desktop\datasets\DatasetB-{1,2}\DatasetB-{1,2}\video\`. B-1 has
+  001-062, B-2 has 063-124.
+- Held-out test videos: `datasets\tests\<name>\`. The report is `datasets\dataset_report.md` and `.csv`.
+- The CASIA-B vectors are cached in `backend/storage/casia_cache`, so `casia_videos evaluate` and
+  `build` take minutes, not hours.
+- Results: `backend/storage/casia_videos_results.json` (line 8.5), `casia_videos_results_line_7.2.json`
+  and `casia_videos_results_line_8.json`.
+- The import log `backend/storage/casia_run.log` is UTF-16 (PowerShell `Tee-Object`): read it with
+  PowerShell, not grep.
+- The team's phone clips: `C:\Users\nabee\Pictures\gait\` (one normal walk each) and `gait_test\`
+  (bag and coat). The team's old Archive went to the Recycle Bin on 2026-11-05.
+
+**Lessons learned (don't rediscover them)**
+- **Training preprocessing** (`casia_b_loader.load_silhouette`, not in this repo): PIL `convert('L')`,
+  then `resize((44, 64), Image.BILINEAR)`, then `/255`. Blank frames are kept, and an empty sequence
+  becomes `zeros((1, 64, 44))`. PIL BILINEAR averages when shrinking and cv2 `INTER_LINEAR` does not;
+  that difference alone broke the baseline. `CCPG_MATCH_CASIA_GEOMETRY` is False for CASIA-B.
+- **The training numbers** (99.27 / 93.26 / 72.36) come from `train.py rank1_from_features` with
+  `protocol='pooled'`; `casia_eval` implements it as `rank1_pooled`.
+- **Drawing the silhouette matters as much as placing it.** Keep any new framing drawn through the
+  PIL path in `casia_clip_frames`.
+- **Eval names vs website names:** `clip_pil` in `casia_eval` = `casia_clip` version 2 on the website;
+  `casia_seq_x` = version 1.
+- **The Archive records the framing, its version, the checkpoint and the frame rate.** Changing any of
+  them makes old Archives incompatible. Bump `PREPROCESS_VERSIONS` in `silhouettes.py` when a framing's
+  output changes.
+- **Kaggle's `/kaggle/input` is a network mount:** read each file whole (`path.read_bytes()`) before
+  decoding; many small reads were 250× slower. A full `casia_eval` run is about 10 min of compute per
+  mode, plus reading time, which ranges from seconds to over an hour.
+- **The `casia_eval` cache** is ignored when `CACHE_VERSION` or the list of modes changes. Bump
+  `CACHE_VERSION` whenever an existing mode's output changes. A new mode goes in `MODES` and in
+  `DEFAULT_MODES` together with `train`, which the baseline check needs.
+- **Comparing the PC layout before and after a CSS change:** drive headless Edge over its DevTools port
+  (Node 24 has WebSocket, nothing to install) and save every element's box and styles per page and
+  window size. Ignore `.verdict-tag`: the case number is random, so its width changes.
+
+**An idea not built yet:** a "possible match" band between the match line and about 12, shown when
+the closest person is clearly ahead of the second. It needs phone data to set the margin. In the
+first recordings the right answers led by 1.86 and 1.06, the wrong one by 0.44.
